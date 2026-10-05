@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "594081431498",
+    "project_id": "smart-chata-486f1",
+    "storage_bucket": "smart-chata-486f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:594081431498:android:fd720b1f2da01db22fd933",
+        "android_client_info": {
+          "package_name": "com.example.smart_chata"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkm-b9IaYwZcBQKNaPdudIoUE6xJ2131g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
