@@ -20,10 +20,15 @@ class OverviewScreen extends ConsumerWidget {
     final chores = ref.watch(cleaningProvider);
 
     // Вычисления для Бюджета
-    final totalLimit = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.limit);
-    final totalSpent = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.currentSpent);
-    final remainingBudget = totalLimit - totalSpent;
-    final budgetProgress = totalLimit > 0 ? (totalSpent / totalLimit).clamp(0.0, 1.0) : 0.0;
+    // Вычисления для Бюджета (Реальная математика)
+    final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
+    final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
+    
+    // Остаток это реальные деньги (Доходы минус Расходы)
+    final remainingBudget = totalIncome - totalSpent;
+    
+    // Прогресс-бар теперь показывает, какую часть от реальных доходов мы потратили
+    final budgetProgress = totalIncome > 0 ? (totalSpent / totalIncome).clamp(0.0, 1.0) : 0.0;
 
     // Вычисления для Инвентаря
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
