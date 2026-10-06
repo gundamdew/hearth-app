@@ -19,12 +19,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   
   final TextEditingController _newItemNameCtrl = TextEditingController();
   final TextEditingController _newItemQtyCtrl = TextEditingController(text: '1');
+  final TextEditingController _newItemThresholdCtrl = TextEditingController(text: '1');
 
   @override
   void dispose() {
     _searchController.dispose();
     _newItemNameCtrl.dispose();
     _newItemQtyCtrl.dispose();
+    _newItemThresholdCtrl.dispose();
     super.dispose();
   }
 
@@ -184,10 +186,24 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               decoration: InputDecoration(hintText: 'Item name', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _newItemQtyCtrl, 
-              keyboardType: TextInputType.number, 
-              decoration: InputDecoration(hintText: 'Quantity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _newItemQtyCtrl, 
+                    keyboardType: TextInputType.number, 
+                    decoration: InputDecoration(hintText: 'Quantity', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _newItemThresholdCtrl, 
+                    keyboardType: TextInputType.number, 
+                    decoration: InputDecoration(hintText: 'Low stock threshold', border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 24),
             SizedBox(
@@ -196,8 +212,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 onPressed: () {
                   if (_newItemNameCtrl.text.isNotEmpty) {
                     final qty = int.tryParse(_newItemQtyCtrl.text) ?? 1;
-                    ref.read(inventoryProvider.notifier).addItem(_newItemNameCtrl.text, 'Pantry', qty, 'pcs', 1);
-                    _newItemNameCtrl.clear();
+                    final threshold = int.tryParse(_newItemThresholdCtrl.text) ?? 1;
+                    ref.read(inventoryProvider.notifier).addItem(_newItemNameCtrl.text, 'Pantry', qty, 'pcs', threshold);
+                    
+                    setState(() {
+                       _newItemNameCtrl.clear();
+                       _newItemQtyCtrl.text = '1';
+                       _newItemThresholdCtrl.text = '1';
+                    });
                     FocusScope.of(context).unfocus();
                   }
                 }, 

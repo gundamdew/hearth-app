@@ -1,9 +1,11 @@
 class RecipeIngredient {
   final String inventoryId;
+  final String name; // Сохраняем имя навсегда, чтобы не терять при удалении из инвентаря
   final int quantity;
 
   RecipeIngredient({
     required this.inventoryId,
+    required this.name,
     required this.quantity,
   });
 }

@@ -2,48 +2,67 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/meal_models.dart';
 import 'inventory_provider.dart';
 
-// Провайдер статических рецептов для "Recipe box"
-final recipesProvider = Provider<List<Recipe>>((ref) {
-  return [
-    Recipe(
-      id: 'r1',
-      name: 'Tomato & garlic pasta',
-      ingredients: [
-        RecipeIngredient(inventoryId: '1', quantity: 1), // Pasta
-        RecipeIngredient(inventoryId: '3', quantity: 2), // Canned tomatoes
-        RecipeIngredient(inventoryId: '10', quantity: 2), // Garlic (Will show RED if inventory has 1)
-      ],
-    ),
-    Recipe(
-      id: 'r2',
-      name: 'Chickpeas & spinach curry',
-      ingredients: [
-        RecipeIngredient(inventoryId: '4', quantity: 2), // Chickpeas (RED if inventory has 1)
-        RecipeIngredient(inventoryId: '6', quantity: 2), // Spinach (RED if inventory has 1)
-        RecipeIngredient(inventoryId: '9', quantity: 1), // Onions
-      ],
-    ),
-    Recipe(
-      id: 'r3',
-      name: 'Shakshuka',
-      ingredients: [
-        RecipeIngredient(inventoryId: '5', quantity: 2), // Eggs
-        RecipeIngredient(inventoryId: '3', quantity: 1), // Canned tomatoes
-        RecipeIngredient(inventoryId: '9', quantity: 1), // Onions
-      ],
-    ),
-    Recipe(
-      id: 'r4',
-      name: 'Roast chicken & rice',
-      ingredients: [
-        RecipeIngredient(inventoryId: '8', quantity: 1), // Chicken thighs
-        RecipeIngredient(inventoryId: '2', quantity: 1), // Rice
-      ],
-    ),
-  ];
+class RecipesNotifier extends Notifier<List<Recipe>> {
+  @override
+  List<Recipe> build() {
+    return [
+      Recipe(
+        id: 'r1',
+        name: 'Tomato & garlic pasta',
+        prepTime: 30,
+        ingredients: [
+          RecipeIngredient(inventoryId: '1', name: 'Pasta', quantity: 1),
+          RecipeIngredient(inventoryId: '3', name: 'Canned tomatoes', quantity: 2),
+          RecipeIngredient(inventoryId: '10', name: 'Garlic', quantity: 2),
+        ],
+      ),
+      Recipe(
+        id: 'r2',
+        name: 'Chickpeas & spinach curry',
+        prepTime: 45,
+        ingredients: [
+          RecipeIngredient(inventoryId: '4', name: 'Chickpeas', quantity: 2),
+          RecipeIngredient(inventoryId: '6', name: 'Spinach', quantity: 2),
+          RecipeIngredient(inventoryId: '9', name: 'Onions', quantity: 1),
+        ],
+      ),
+      Recipe(
+        id: 'r3',
+        name: 'Shakshuka',
+        prepTime: 25,
+        ingredients: [
+          RecipeIngredient(inventoryId: '5', name: 'Eggs', quantity: 2),
+          RecipeIngredient(inventoryId: '3', name: 'Canned tomatoes', quantity: 1),
+          RecipeIngredient(inventoryId: '9', name: 'Onions', quantity: 1),
+        ],
+      ),
+      Recipe(
+        id: 'r4',
+        name: 'Roast chicken & rice',
+        prepTime: 60,
+        ingredients: [
+          RecipeIngredient(inventoryId: '8', name: 'Chicken thighs', quantity: 1),
+          RecipeIngredient(inventoryId: '2', name: 'Rice', quantity: 1),
+        ],
+      ),
+    ];
+  }
+
+  void addRecipe(String name, int prepTime, List<RecipeIngredient> ingredients) {
+    final newRecipe = Recipe(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      prepTime: prepTime,
+      ingredients: ingredients,
+    );
+    state = [...state, newRecipe];
+  }
+}
+
+final recipesProvider = NotifierProvider<RecipesNotifier, List<Recipe>>(() {
+  return RecipesNotifier();
 });
 
-// Управление планом питания и вычитанием ингредиентов
 class MealPlanNotifier extends Notifier<List<MealPlan>> {
   @override
   List<MealPlan> build() {
@@ -59,18 +78,14 @@ class MealPlanNotifier extends Notifier<List<MealPlan>> {
   }
 
   void markCooked(String mealPlanId, String recipeId) {
-    // 1. Находим рецепт
     final recipes = ref.read(recipesProvider);
     final recipe = recipes.firstWhere((r) => r.id == recipeId);
 
-    // 2. Вычитаем ингредиенты из inventory
     final inventoryNotifier = ref.read(inventoryProvider.notifier);
     for (var ingredient in recipe.ingredients) {
-      // Передаем отрицательное значение для вычитания
       inventoryNotifier.updateQuantity(ingredient.inventoryId, -ingredient.quantity);
     }
 
-    // 3. Обновляем статус в плане питания
     state = state.map((meal) {
       if (meal.id == mealPlanId) {
         return meal.copyWith(isCooked: true);
