@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/budget_models.dart';
 import '../providers/budget_provider.dart';
-import '../providers/users_provider.dart'; // ДОБАВИТЬ ИМПОРТ
+import '../providers/users_provider.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -17,7 +17,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   String? _selectedCategory;
-  String? _selectedAssignee; // Больше не 'Maya' по умолчанию
+  String? _selectedAssignee;
   String _transactionType = 'Expense';
 
   @override
@@ -44,15 +44,38 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     }
   }
 
+  void _showEditLimitDialog(BuildContext context, WidgetRef ref, BudgetCategory cat) {
+    final controller = TextEditingController(text: cat.limit.toStringAsFixed(0));
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit ${cat.name} Limit'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: 'Enter new limit'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final newLimit = double.tryParse(controller.text) ?? cat.limit;
+              ref.read(budgetProvider.notifier).updateCategoryLimit(cat.name, newLimit);
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final budgetState = ref.watch(budgetProvider);
     final users = ref.watch(usersProvider);
-    
-    // Динамический расчет долга
     final debtMessage = ref.read(budgetProvider.notifier).calculateDebt(users);
 
-    // Защита от отсутствия выбранного пользователя или его удаления
     if (users.isNotEmpty && (_selectedAssignee == null || !users.any((u) => u.name == _selectedAssignee))) {
       _selectedAssignee = users.first.name;
     }
@@ -92,8 +115,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              
-              // Динамическая генерация карточек статистики для каждого пользователя
               Row(
                 children: users.map((user) {
                   final income = budgetState.incomes.where((i) => i.assignee == user.name).fold(0.0, (s, i) => s + i.amount);
@@ -101,7 +122,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   return _buildUserStatCard(user.name, income, expense, user.color);
                 }).toList(),
               ),
-              
               const SizedBox(height: 48),
               Text('Categories', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24)),
               const SizedBox(height: 24),
@@ -119,7 +139,15 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(cat.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                            Text('${cat.currentSpent.toStringAsFixed(0)} / ${cat.limit.toStringAsFixed(0)} USD', style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight)),
+                            Row(
+                              children: [
+                                Text('${cat.currentSpent.toStringAsFixed(0)} / ${cat.limit.toStringAsFixed(0)} USD', style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight)),
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 16, color: AppTheme.textLight),
+                                  onPressed: () => _showEditLimitDialog(context, ref, cat),
+                                )
+                              ],
+                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
@@ -133,7 +161,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           ),
         ),
         const SizedBox(width: 48),
-
         Expanded(
           flex: 4,
           child: Column(
@@ -169,7 +196,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     Row(
                       children: [
                         Expanded(
-                          // Динамический выпадающий список пользователей
                           child: DropdownButtonFormField<String>(
                             value: _selectedAssignee,
                             decoration: InputDecoration(enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)))),
@@ -233,7 +259,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget _buildUserStatCard(String name, double income, double expense, Color color) {
     return Expanded(
       child: Container(
-        margin: const EdgeInsets.only(right: 16), // Отступ между карточками
+        margin: const EdgeInsets.only(right: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
         child: Column(

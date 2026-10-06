@@ -6,7 +6,6 @@ class BudgetNotifier extends Notifier<BudgetState> {
   @override
   BudgetState build() {
     return BudgetState(
-      // Оставляем категории, но сбрасываем текущие траты до 0
       categories: [
         BudgetCategory(id: 'cat1', name: 'Groceries', limit: 800, currentSpent: 0.0),
         BudgetCategory(id: 'cat2', name: 'Rent', limit: 1650, currentSpent: 0.0),
@@ -15,7 +14,6 @@ class BudgetNotifier extends Notifier<BudgetState> {
         BudgetCategory(id: 'cat5', name: 'Transport', limit: 150, currentSpent: 0.0),
         BudgetCategory(id: 'cat6', name: 'Eating out', limit: 300, currentSpent: 0.0),
       ],
-      // Очищаем историю транзакций
       expenses: [],
       incomes: [],
     );
@@ -53,6 +51,17 @@ class BudgetNotifier extends Notifier<BudgetState> {
       date: DateTime.now(),
     );
     state = state.copyWith(incomes: [newIncome, ...state.incomes]);
+  }
+
+  void updateCategoryLimit(String categoryName, double newLimit) {
+    final updatedCategories = state.categories.map((cat) {
+      if (cat.name == categoryName) {
+        return cat.copyWith(limit: newLimit);
+      }
+      return cat;
+    }).toList();
+    
+    state = state.copyWith(categories: updatedCategories);
   }
 
   String calculateDebt(List<AppUser> users) {

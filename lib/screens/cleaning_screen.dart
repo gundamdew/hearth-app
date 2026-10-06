@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/chore.dart';
+import '../models/user_model.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
-import '../models/user_model.dart';
 
 class CleaningScreen extends ConsumerStatefulWidget {
   const CleaningScreen({super.key});
@@ -44,15 +44,9 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     final users = ref.watch(usersProvider);
     final userNames = users.map((u) => u.name).toList();
 
-    // Защита: если юзеров нет, ставим заглушку
-    if (_selectedAssignee == null && users.isNotEmpty) {
-      _selectedAssignee = users.first.name;
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Динамические карточки пользователей
         Row(
           children: [
             ...users.map((user) {
@@ -100,7 +94,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildAddTaskForm(users.map((u) => u.name).toList()),
+                _buildAddTaskForm(userNames),
               ],
             ),
           ),
@@ -141,7 +135,6 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
 
   Widget _buildChoreRow(BuildContext context, Chore chore, List<String> availableUsers) {
     final users = ref.watch(usersProvider);
-    // Ищем цвет пользователя. Если пользователь удален, ставим серый.
     final userColor = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '', pinCode: '', color: AppTheme.textLight)).color;
 
     return Padding(
@@ -181,6 +174,10 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
   }
 
   Widget _buildAddTaskForm(List<String> userNames) {
+    String? validAssignee = userNames.contains(_selectedAssignee) 
+        ? _selectedAssignee 
+        : (userNames.isNotEmpty ? userNames.first : null);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppTheme.textLight.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
@@ -200,7 +197,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   isExpanded: true,
-                  value: _selectedAssignee,
+                  value: validAssignee,
                   items: userNames.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
                   onChanged: (val) => setState(() => _selectedAssignee = val),
                 ),

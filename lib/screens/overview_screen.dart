@@ -1,39 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../providers/budget_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/meals_provider.dart';
 import '../providers/cleaning_provider.dart';
+import '../providers/users_provider.dart';
+import '../models/user_model.dart';
 
 class OverviewScreen extends ConsumerWidget {
   const OverviewScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Подписываемся на все провайдеры
     final budgetState = ref.watch(budgetProvider);
     final inventory = ref.watch(inventoryProvider);
     final mealPlan = ref.watch(mealPlanProvider);
     final recipes = ref.watch(recipesProvider);
     final chores = ref.watch(cleaningProvider);
+    final users = ref.watch(usersProvider);
 
-    // Вычисления для Бюджета
-    // Вычисления для Бюджета (Реальная математика)
     final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
     final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
-    
-    // Остаток это реальные деньги (Доходы минус Расходы)
     final remainingBudget = totalIncome - totalSpent;
-    
-    // Прогресс-бар теперь показывает, какую часть от реальных доходов мы потратили
     final budgetProgress = totalIncome > 0 ? (totalSpent / totalIncome).clamp(0.0, 1.0) : 0.0;
 
-    // Вычисления для Инвентаря
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
 
-    // Вычисления для Плана питания
     final todaysPlan = mealPlan.firstWhere(
       (plan) => plan.day == 'MON', 
       orElse: () => mealPlan.first,
@@ -43,12 +38,17 @@ class OverviewScreen extends ConsumerWidget {
         : null;
     final plannedDinnersCount = mealPlan.where((p) => p.recipeId != null).length;
 
+    final headerNames = users.isEmpty 
+        ? 'NO RESIDENTS' 
+        : users.map((u) => u.name.toUpperCase()).join(' & ');
+    final dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now()).toUpperCase();
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'MAYA & JONAH · MONDAY, OCTOBER 4',
+            '$headerNames · $dateStr',
             style: GoogleFonts.instrumentSans(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -57,12 +57,9 @@ class OverviewScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 32),
-          
-          // ВЕРХНИЙ РЯД
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Блок Бюджета
               Expanded(
                 flex: 1,
                 child: Container(
@@ -108,8 +105,6 @@ class OverviewScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 24),
-              
-              // 2. Блок Ужина
               Expanded(
                 flex: 1,
                 child: Container(
@@ -143,7 +138,7 @@ class OverviewScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                       Text(
                         '$plannedDinnersCount of 7 dinners planned',
-                        style: TextStyle(color: AppTheme.textLight, fontSize: 14),
+                        style: const TextStyle(color: AppTheme.textLight, fontSize: 14),
                       ),
                     ],
                   ),
@@ -152,12 +147,9 @@ class OverviewScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
-          // НИЖНИЙ РЯД
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 3. Блок заканчивающихся запасов
               Expanded(
                 flex: 1,
                 child: Container(
@@ -184,13 +176,13 @@ class OverviewScreen extends ConsumerWidget {
                           ),
                           Text(
                             '${runningLowItems.length} items',
-                            style: TextStyle(color: AppTheme.textLight, fontSize: 12),
+                            style: const TextStyle(color: AppTheme.textLight, fontSize: 12),
                           ),
                         ],
                       ),
                       const SizedBox(height: 24),
                       if (runningLowItems.isEmpty)
-                        Text('Everything is stocked up!', style: TextStyle(color: AppTheme.textLight)),
+                        const Text('Everything is stocked up!', style: TextStyle(color: AppTheme.textLight)),
                       ...runningLowItems.map((item) => Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
                         child: Row(
@@ -209,8 +201,6 @@ class OverviewScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 24),
-              
-              // 4. Блок задач
               Expanded(
                 flex: 1,
                 child: Container(
@@ -234,8 +224,8 @@ class OverviewScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       ...chores.map((chore) {
-                        final isMaya = chore.assignee == 'Maya';
-                        final userColor = isMaya ? AppTheme.terracotta : AppTheme.sage;
+                        final users = ref.watch(usersProvider);
+                        final user = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '?', pinCode: '', color: AppTheme.textLight));
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
@@ -262,13 +252,13 @@ class OverviewScreen extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: userColor.withValues(alpha: 0.15),
+                                  color: user.color.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   chore.assignee,
                                   style: TextStyle(
-                                    color: userColor,
+                                    color: user.color,
                                     fontSize: 12,
                                     fontWeight: FontWeight.w600,
                                   ),

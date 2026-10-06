@@ -24,6 +24,18 @@ class InventoryNotifier extends Notifier<List<InventoryItem>> {
   void removeItem(String id) {
     state = state.where((item) => item.id != id).toList();
   }
+
+  void addItem(String name, String location, int quantity, String unit, int threshold) {
+    final newItem = InventoryItem(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      location: location,
+      quantity: quantity,
+      unit: unit,
+      lowStockThreshold: threshold,
+    );
+    state = [...state, newItem];
+  }
 }
 
 final inventoryProvider = NotifierProvider<InventoryNotifier, List<InventoryItem>>(() => InventoryNotifier());
