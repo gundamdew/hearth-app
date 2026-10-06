@@ -8,6 +8,7 @@ import 'screens/meals_screen.dart';
 import 'screens/cleaning_screen.dart';
 import 'screens/budget_screen.dart';
 import 'screens/overview_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
  runApp(
@@ -60,6 +61,10 @@ final _router = GoRouter(
           path: '/cleaning',
           builder: (context, state) => const CleaningScreen(),
         ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
       ],
     ),
   ],
@@ -99,6 +104,7 @@ class MainScaffold extends StatelessWidget {
                   // Ссылки навигации
                   Row(
                     children: [
+                      _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
                       _NavItem(title: 'Overview', path: '/overview', currentPath: currentPath),
                       _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
                       _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),

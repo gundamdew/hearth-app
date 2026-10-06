@@ -4,12 +4,30 @@ class Expense {
   final double amount;
   final String category;
   final DateTime date;
+  final String assignee; // Привязка к человеку
 
   Expense({
     required this.id,
     required this.title,
     required this.amount,
     required this.category,
+    required this.date,
+    required this.assignee,
+  });
+}
+
+class Income {
+  final String id;
+  final String title;
+  final double amount;
+  final String assignee; // Источник (кто принес)
+  final DateTime date;
+
+  Income({
+    required this.id,
+    required this.title,
+    required this.amount,
+    required this.assignee,
     required this.date,
   });
 }
@@ -45,19 +63,23 @@ class BudgetCategory {
 class BudgetState {
   final List<BudgetCategory> categories;
   final List<Expense> expenses;
+  final List<Income> incomes; // Новый список поступлений
 
   BudgetState({
     required this.categories,
     required this.expenses,
+    required this.incomes,
   });
 
   BudgetState copyWith({
     List<BudgetCategory>? categories,
     List<Expense>? expenses,
+    List<Income>? incomes,
   }) {
     return BudgetState(
       categories: categories ?? this.categories,
       expenses: expenses ?? this.expenses,
+      incomes: incomes ?? this.incomes,
     );
   }
 }
