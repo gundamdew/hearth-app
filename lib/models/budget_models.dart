@@ -1,10 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Expense {
   final String id;
   final String title;
   final double amount;
   final String category;
   final DateTime date;
-  final String assignee; // Привязка к человеку
+  final String assignee;
 
   Expense({
     required this.id,
@@ -14,13 +16,34 @@ class Expense {
     required this.date,
     required this.assignee,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'amount': amount,
+      'category': category,
+      'date': Timestamp.fromDate(date),
+      'assignee': assignee,
+    };
+  }
+
+  factory Expense.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return Expense(
+      id: documentId,
+      title: map['title'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      category: map['category'] ?? '',
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      assignee: map['assignee'] ?? '',
+    );
+  }
 }
 
 class Income {
   final String id;
   final String title;
   final double amount;
-  final String assignee; // Источник (кто принес)
+  final String assignee;
   final DateTime date;
 
   Income({
@@ -30,6 +53,25 @@ class Income {
     required this.assignee,
     required this.date,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'amount': amount,
+      'assignee': assignee,
+      'date': Timestamp.fromDate(date),
+    };
+  }
+
+  factory Income.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return Income(
+      id: documentId,
+      title: map['title'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      assignee: map['assignee'] ?? '',
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
 }
 
 class BudgetCategory {
@@ -45,12 +87,7 @@ class BudgetCategory {
     this.currentSpent = 0.0,
   });
 
-  BudgetCategory copyWith({
-    String? id,
-    String? name,
-    double? limit,
-    double? currentSpent,
-  }) {
+  BudgetCategory copyWith({String? id, String? name, double? limit, double? currentSpent}) {
     return BudgetCategory(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -58,12 +95,29 @@ class BudgetCategory {
       currentSpent: currentSpent ?? this.currentSpent,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'limit': limit,
+    };
+  }
+
+  factory BudgetCategory.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return BudgetCategory(
+      id: documentId,
+      name: map['name'] ?? '',
+      limit: (map['limit'] ?? 0).toDouble(),
+      // currentSpent вычисляется динамически на основе расходов, поэтому в БД не сохраняем
+      currentSpent: 0.0,
+    );
+  }
 }
 
 class BudgetState {
   final List<BudgetCategory> categories;
   final List<Expense> expenses;
-  final List<Income> incomes; // Новый список поступлений
+  final List<Income> incomes;
 
   BudgetState({
     required this.categories,

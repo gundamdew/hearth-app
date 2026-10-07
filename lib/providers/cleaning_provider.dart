@@ -1,74 +1,65 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chore.dart';
 
-class CleaningNotifier extends Notifier<List<Chore>> {
-  @override
-  List<Chore> build() {
-    return [
-      Chore(id: 'c1', name: 'Wash dishes', category: 'Kitchen', assignee: 'Maya'),
-      Chore(id: 'c2', name: 'Take out trash', category: 'Kitchen', assignee: 'Jonah'),
-      Chore(id: 'c3', name: 'Vacuum living room', category: 'Living room', assignee: 'Jonah'),
-      Chore(id: 'c4', name: 'Clean bathroom', category: 'Bathroom', assignee: 'Maya'),
-    ];
+final cleaningProvider = StreamProvider<List<Chore>>((ref) {
+  return FirebaseFirestore.instance.collection('chores').snapshots().map(
+    (snapshot) => snapshot.docs.map((doc) => Chore.fromFirestore(doc.data(), doc.id)).toList()
+  );
+});
+
+final cleaningControllerProvider = Provider((ref) => CleaningController());
+
+class CleaningController {
+  final _db = FirebaseFirestore.instance;
+
+  Future<void> addChore(String name, String category, String assignee) async {
+    final chore = Chore(id: '', name: name, category: category, assignee: assignee);
+    await _db.collection('chores').add(chore.toMap());
   }
 
-  void addChore(String name, String category, String assignee) {
-    final newChore = Chore(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      category: category,
-      assignee: assignee,
-    );
-    state = [...state, newChore];
+  Future<void> deleteChore(String id) async {
+    await _db.collection('chores').doc(id).delete();
   }
 
-  void deleteChore(String id) {
-    state = state.where((chore) => chore.id != id).toList();
+  Future<void> toggleStatus(String id, bool currentStatus) async {
+    await _db.collection('chores').doc(id).update({'isDone': !currentStatus});
   }
 
-  void toggleStatus(String id) {
-    state = state.map((chore) {
-      if (chore.id == id) return chore.copyWith(isDone: !chore.isDone);
-      return chore;
-    }).toList();
-  }
-
-  void changeAssignee(String id, List<String> availableUsers) {
+  Future<void> changeAssignee(String id, String currentAssignee, List<String> availableUsers) async {
     if (availableUsers.isEmpty) return;
-    
-    state = state.map((chore) {
-      if (chore.id == id) {
-        final currentIndex = availableUsers.indexOf(chore.assignee);
-        final nextIndex = (currentIndex + 1) % availableUsers.length;
-        return chore.copyWith(assignee: availableUsers[nextIndex]);
-      }
-      return chore;
-    }).toList();
+    final currentIndex = availableUsers.indexOf(currentAssignee);
+    final nextIndex = (currentIndex + 1) % availableUsers.length;
+    await _db.collection('chores').doc(id).update({'assignee': availableUsers[nextIndex]});
   }
 
-  void balanceLoad(List<String> availableUsers) {
+  Future<void> balanceLoad(List<Chore> currentChores, List<String> availableUsers) async {
     if (availableUsers.isEmpty) return;
-    final newState = List<Chore>.from(state);
+    final batch = _db.batch();
     int undoneIndex = 0;
-    
-    for (int i = 0; i < newState.length; i++) {
-      if (!newState[i].isDone) {
+
+    for (var chore in currentChores) {
+      if (!chore.isDone) {
         final assignedTo = availableUsers[undoneIndex % availableUsers.length];
-        newState[i] = newState[i].copyWith(assignee: assignedTo);
+        batch.update(_db.collection('chores').doc(chore.id), {'assignee': assignedTo});
         undoneIndex++;
       }
     }
-    state = newState;
+    await batch.commit();
   }
 
-  void swapAndNewWeek(List<String> availableUsers) {
+  Future<void> swapAndNewWeek(List<Chore> currentChores, List<String> availableUsers) async {
     if (availableUsers.isEmpty) return;
-    state = state.map((chore) {
+    final batch = _db.batch();
+
+    for (var chore in currentChores) {
       final currentIndex = availableUsers.indexOf(chore.assignee);
       final nextIndex = currentIndex != -1 ? (currentIndex + 1) % availableUsers.length : 0;
-      return chore.copyWith(assignee: availableUsers[nextIndex], isDone: false);
-    }).toList();
+      batch.update(_db.collection('chores').doc(chore.id), {
+        'assignee': availableUsers[nextIndex],
+        'isDone': false,
+      });
+    }
+    await batch.commit();
   }
 }
-
-final cleaningProvider = NotifierProvider<CleaningNotifier, List<Chore>>(() => CleaningNotifier());

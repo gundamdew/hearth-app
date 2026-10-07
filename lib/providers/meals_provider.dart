@@ -1,100 +1,69 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/meal_models.dart';
-import 'inventory_provider.dart';
 
-class RecipesNotifier extends Notifier<List<Recipe>> {
-  @override
-  List<Recipe> build() {
-    return [
-      Recipe(
-        id: 'r1',
-        name: 'Tomato & garlic pasta',
-        prepTime: 30,
-        ingredients: [
-          RecipeIngredient(inventoryId: '1', name: 'Pasta', quantity: 1),
-          RecipeIngredient(inventoryId: '3', name: 'Canned tomatoes', quantity: 2),
-          RecipeIngredient(inventoryId: '10', name: 'Garlic', quantity: 2),
-        ],
-      ),
-      Recipe(
-        id: 'r2',
-        name: 'Chickpeas & spinach curry',
-        prepTime: 45,
-        ingredients: [
-          RecipeIngredient(inventoryId: '4', name: 'Chickpeas', quantity: 2),
-          RecipeIngredient(inventoryId: '6', name: 'Spinach', quantity: 2),
-          RecipeIngredient(inventoryId: '9', name: 'Onions', quantity: 1),
-        ],
-      ),
-      Recipe(
-        id: 'r3',
-        name: 'Shakshuka',
-        prepTime: 25,
-        ingredients: [
-          RecipeIngredient(inventoryId: '5', name: 'Eggs', quantity: 2),
-          RecipeIngredient(inventoryId: '3', name: 'Canned tomatoes', quantity: 1),
-          RecipeIngredient(inventoryId: '9', name: 'Onions', quantity: 1),
-        ],
-      ),
-      Recipe(
-        id: 'r4',
-        name: 'Roast chicken & rice',
-        prepTime: 60,
-        ingredients: [
-          RecipeIngredient(inventoryId: '8', name: 'Chicken thighs', quantity: 1),
-          RecipeIngredient(inventoryId: '2', name: 'Rice', quantity: 1),
-        ],
-      ),
-    ];
-  }
-
-  void addRecipe(String name, int prepTime, List<RecipeIngredient> ingredients) {
-    final newRecipe = Recipe(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      prepTime: prepTime,
-      ingredients: ingredients,
-    );
-    state = [...state, newRecipe];
-  }
-}
-
-final recipesProvider = NotifierProvider<RecipesNotifier, List<Recipe>>(() {
-  return RecipesNotifier();
+final recipesProvider = StreamProvider<List<Recipe>>((ref) {
+  return FirebaseFirestore.instance.collection('recipes').snapshots().map(
+    (snapshot) => snapshot.docs.map((doc) => Recipe.fromFirestore(doc.data(), doc.id)).toList()
+  );
 });
 
-class MealPlanNotifier extends Notifier<List<MealPlan>> {
-  @override
-  List<MealPlan> build() {
-    return [
-      MealPlan(id: 'm1', day: 'MON', recipeId: 'r1'),
-      MealPlan(id: 'm2', day: 'TUE', recipeId: 'r2'),
-      MealPlan(id: 'm3', day: 'WED', recipeId: null),
-      MealPlan(id: 'm4', day: 'THU', recipeId: 'r3'),
-      MealPlan(id: 'm5', day: 'FRI', recipeId: null),
-      MealPlan(id: 'm6', day: 'SAT', recipeId: 'r4'),
-      MealPlan(id: 'm7', day: 'SUN', recipeId: null),
-    ];
+final mealPlanProvider = StreamProvider<List<MealPlan>>((ref) {
+  return FirebaseFirestore.instance.collection('meal_plans').orderBy('day').snapshots().map(
+    (snapshot) => snapshot.docs.map((doc) => MealPlan.fromFirestore(doc.data(), doc.id)).toList()
+  );
+});
+
+final mealsControllerProvider = Provider((ref) => MealsController(ref));
+
+class MealsController {
+  final Ref _ref;
+  final _db = FirebaseFirestore.instance;
+
+  MealsController(this._ref);
+
+  Future<void> initializeMealPlans() async {
+    final snap = await _db.collection('meal_plans').limit(1).get();
+    if (snap.docs.isEmpty) {
+      final batch = _db.batch();
+      final days = ['1_MON', '2_TUE', '3_WED', '4_THU', '5_FRI', '6_SAT', '7_SUN'];
+      for (var dayData in days) {
+        final parts = dayData.split('_');
+        final doc = _db.collection('meal_plans').doc(parts[0]);
+        batch.set(doc, {'day': parts[1], 'recipeId': null, 'isCooked': false});
+      }
+      await batch.commit();
+    }
   }
 
-  void markCooked(String mealPlanId, String recipeId) {
-    final recipes = ref.read(recipesProvider);
-    final recipe = recipes.firstWhere((r) => r.id == recipeId);
+  Future<void> addRecipe(String name, int prepTime, List<RecipeIngredient> ingredients) async {
+    final recipe = Recipe(id: '', name: name, prepTime: prepTime, ingredients: ingredients);
+    await _db.collection('recipes').add(recipe.toMap());
+  }
 
-    final inventoryNotifier = ref.read(inventoryProvider.notifier);
+  Future<void> assignRecipe(String mealPlanId, String recipeId) async {
+    await _db.collection('meal_plans').doc(mealPlanId).update({'recipeId': recipeId, 'isCooked': false});
+  }
+
+  Future<void> clearRecipe(String mealPlanId) async {
+    await _db.collection('meal_plans').doc(mealPlanId).update({'recipeId': null, 'isCooked': false});
+  }
+
+  Future<void> markCooked(String mealPlanId, String recipeId) async {
+    final recipesVal = _ref.read(recipesProvider).value ?? [];
+    final recipe = recipesVal.firstWhere((r) => r.id == recipeId);
+
+    final batch = _db.batch();
+
     for (var ingredient in recipe.ingredients) {
-      inventoryNotifier.updateQuantity(ingredient.inventoryId, -ingredient.quantity);
+      if (ingredient.inventoryId.isNotEmpty) {
+        batch.update(_db.collection('inventory').doc(ingredient.inventoryId), {
+          'quantity': FieldValue.increment(-ingredient.quantity)
+        });
+      }
     }
 
-    state = state.map((meal) {
-      if (meal.id == mealPlanId) {
-        return meal.copyWith(isCooked: true);
-      }
-      return meal;
-    }).toList();
+    batch.update(_db.collection('meal_plans').doc(mealPlanId), {'isCooked': true});
+    await batch.commit();
   }
 }
-
-final mealPlanProvider = NotifierProvider<MealPlanNotifier, List<MealPlan>>(() {
-  return MealPlanNotifier();
-});

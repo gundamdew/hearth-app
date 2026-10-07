@@ -1,6 +1,6 @@
 class RecipeIngredient {
   final String inventoryId;
-  final String name; // Сохраняем имя навсегда, чтобы не терять при удалении из инвентаря
+  final String name;
   final int quantity;
 
   RecipeIngredient({
@@ -8,6 +8,22 @@ class RecipeIngredient {
     required this.name,
     required this.quantity,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'inventoryId': inventoryId,
+      'name': name,
+      'quantity': quantity,
+    };
+  }
+
+  factory RecipeIngredient.fromMap(Map<String, dynamic> map) {
+    return RecipeIngredient(
+      inventoryId: map['inventoryId'] ?? '',
+      name: map['name'] ?? '',
+      quantity: map['quantity']?.toInt() ?? 1,
+    );
+  }
 }
 
 class Recipe {
@@ -22,6 +38,25 @@ class Recipe {
     required this.ingredients,
     this.prepTime,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'prepTime': prepTime,
+      'ingredients': ingredients.map((x) => x.toMap()).toList(),
+    };
+  }
+
+  factory Recipe.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return Recipe(
+      id: documentId,
+      name: map['name'] ?? '',
+      prepTime: map['prepTime']?.toInt(),
+      ingredients: List<RecipeIngredient>.from(
+        (map['ingredients'] as List<dynamic>? ?? []).map((x) => RecipeIngredient.fromMap(x)),
+      ),
+    );
+  }
 }
 
 class MealPlan {
@@ -37,17 +72,29 @@ class MealPlan {
     this.isCooked = false,
   });
 
-  MealPlan copyWith({
-    String? id,
-    String? day,
-    String? recipeId,
-    bool? isCooked,
-  }) {
+  MealPlan copyWith({String? id, String? day, String? recipeId, bool? isCooked}) {
     return MealPlan(
       id: id ?? this.id,
       day: day ?? this.day,
       recipeId: recipeId ?? this.recipeId,
       isCooked: isCooked ?? this.isCooked,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'day': day,
+      'recipeId': recipeId,
+      'isCooked': isCooked,
+    };
+  }
+
+  factory MealPlan.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return MealPlan(
+      id: documentId,
+      day: map['day'] ?? 'MON',
+      recipeId: map['recipeId'],
+      isCooked: map['isCooked'] ?? false,
     );
   }
 }

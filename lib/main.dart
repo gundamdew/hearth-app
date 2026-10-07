@@ -1,22 +1,55 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
+import 'firebase_options.dart';
 import 'theme.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Ядро стейт-менеджера
-import 'screens/inventory_screen.dart'; // Твой новый интерфейс
+import 'screens/budget_screen.dart';
+import 'screens/inventory_screen.dart';
 import 'screens/meals_screen.dart';
 import 'screens/cleaning_screen.dart';
-import 'screens/budget_screen.dart';
 import 'screens/overview_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/login_screen.dart';
+import 'providers/budget_provider.dart';
+import 'providers/meals_provider.dart';
+import 'providers/auth_provider.dart';
 
-void main() {
- runApp(
-  const ProviderScope(
-    child: HearthApp(),
-  ),
-);
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  final container = ProviderContainer();
+  await container.read(budgetControllerProvider).initializeCategories();
+  await container.read(mealsControllerProvider).initializeMealPlans();
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const HearthApp(),
+    ),
+  );
 }
+
+final _router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    ShellRoute(
+      builder: (context, state, child) => MainScaffold(currentPath: state.uri.path, child: child),
+      routes: [
+        GoRoute(path: '/', builder: (context, state) => const OverviewScreen()),
+        GoRoute(path: '/budget', builder: (context, state) => const BudgetScreen()),
+        GoRoute(path: '/inventory', builder: (context, state) => const InventoryScreen()),
+        GoRoute(path: '/meals', builder: (context, state) => const MealsScreen()),
+        GoRoute(path: '/cleaning', builder: (context, state) => const CleaningScreen()),
+        GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+      ],
+    ),
+  ],
+);
 
 class HearthApp extends StatelessWidget {
   const HearthApp({super.key});
@@ -25,158 +58,108 @@ class HearthApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Hearth',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       routerConfig: _router,
-      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-// Настройка GoRouter с ShellRoute для сохранения верхней навигации
-final _router = GoRouter(
-  initialLocation: '/overview',
-  routes: [
-    ShellRoute(
-      builder: (context, state, child) {
-        return MainScaffold(child: child);
-      },
-      routes: [
-        GoRoute(
-          path: '/overview',
-          builder: (context, state) => const OverviewScreen(),
-        ),
-        GoRoute(
-          path: '/budget',
-          builder: (context, state) => const BudgetScreen(),
-        ),
-        GoRoute(
-          path: '/inventory',
-          builder: (context, state) => const InventoryScreen(), // Здесь вызывается твой интерфейс
-        ),
-        GoRoute(
-          path: '/meals',
-          builder: (context, state) => const MealsScreen(),
-        ),
-        GoRoute(
-          path: '/cleaning',
-          builder: (context, state) => const CleaningScreen(),
-        ),
-        GoRoute(
-          path: '/settings',
-          builder: (context, state) => const SettingsScreen(),
-        ),
-      ],
-    ),
-  ],
-);
-
-// Главный Scaffold с верхней панелью навигации
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends ConsumerWidget {
   final Widget child;
+  final String currentPath;
 
-  const MainScaffold({super.key, required this.child});
+  const MainScaffold({super.key, required this.child, required this.currentPath});
 
   @override
-  Widget build(BuildContext context) {
-    // Получаем текущий путь для подсветки активной вкладки
-    final currentPath = GoRouterState.of(context).uri.path;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider);
+
+    if (currentUser == null) {
+      return const LoginScreen();
+    }
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Верхняя навигационная панель
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Логотип/Заголовок
-                  Text(
-                    'Hearth.',
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      fontSize: 32,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  // Ссылки навигации
-                  Row(
-                    children: [
-                      _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
-                      _NavItem(title: 'Overview', path: '/overview', currentPath: currentPath),
-                      _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
-                      _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),
-                      _NavItem(title: 'Meals', path: '/meals', currentPath: currentPath),
-                      _NavItem(title: 'Cleaning', path: '/cleaning', currentPath: currentPath),
-                    ],
-                  )
-                ],
-              ),
-              const SizedBox(height: 32),
-              // Динамический контент (экраны)
-              Expanded(child: child),
-            ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Hearth.',
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 48),
+                ),
+                Row(
+                  children: [
+                    _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
+                    _NavItem(title: 'Overview', path: '/', currentPath: currentPath),
+                    _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
+                    _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),
+                    _NavItem(title: 'Meals', path: '/meals', currentPath: currentPath),
+                    _NavItem(title: 'Cleaning', path: '/cleaning', currentPath: currentPath),
+                    const SizedBox(width: 48),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2))),
+                      child: Row(
+                        children: [
+                          CircleAvatar(radius: 12, backgroundColor: currentUser.color.withValues(alpha: 0.2), child: Text(currentUser.name[0], style: TextStyle(color: currentUser.color, fontSize: 10, fontWeight: FontWeight.bold))),
+                          const SizedBox(width: 8),
+                          Text(currentUser.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => ref.read(currentUserProvider.notifier).logout(), // ИЗМЕНЕНО
+                            child: const Icon(Icons.logout, size: 16, color: AppTheme.textLight),
+                          )
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48.0),
+              child: child,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// Компонент кнопки навигации
 class _NavItem extends StatelessWidget {
   final String title;
   final String path;
   final String currentPath;
 
-  const _NavItem({
-    required this.title,
-    required this.path,
-    required this.currentPath,
-  });
+  const _NavItem({required this.title, required this.path, required this.currentPath});
 
   @override
   Widget build(BuildContext context) {
     final isActive = currentPath == path;
-    
     return Padding(
-      padding: const EdgeInsets.only(left: 8.0),
-      child: TextButton(
-        onPressed: () => context.go(path),
-        style: TextButton.styleFrom(
-          backgroundColor: isActive ? AppTheme.mossGreen : Colors.transparent,
-          foregroundColor: isActive ? Colors.white : AppTheme.textLight,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+      padding: const EdgeInsets.only(left: 32.0),
+      child: GestureDetector(
+        onTap: () => context.go(path),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AppTheme.mossGreen : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
           ),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isActive ? Colors.white : AppTheme.textLight,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// Экраны-заглушки для вкладок
-class PlaceholderScreen extends StatelessWidget {
-  final String title;
-
-  const PlaceholderScreen({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$title Screen',
-        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-          color: AppTheme.textLight,
         ),
       ),
     );

@@ -1,38 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
-import '../theme.dart';
 
-class UsersNotifier extends Notifier<List<AppUser>> {
-  @override
-  List<AppUser> build() {
-    // Базовые пользователи для сохранения работоспособности старых данных
-    return [
-      AppUser(id: 'u1', name: 'Maya', pinCode: '0000', color: AppTheme.terracotta),
-      AppUser(id: 'u2', name: 'Jonah', pinCode: '1111', color: AppTheme.sage),
-    ];
+final usersProvider = StreamProvider<List<AppUser>>((ref) {
+  return FirebaseFirestore.instance.collection('users').snapshots().map(
+    (snapshot) => snapshot.docs.map((doc) => AppUser.fromFirestore(doc.data(), doc.id)).toList()
+  );
+});
+
+final usersControllerProvider = Provider((ref) => UsersController());
+
+class UsersController {
+  final _db = FirebaseFirestore.instance;
+
+  Future<void> addUser(String name, String pinCode, Color color) async {
+    final user = AppUser(id: '', name: name, pinCode: pinCode, color: color);
+    await _db.collection('users').add(user.toMap());
   }
 
-  void addUser(String name, String pinCode, Color color) {
-    final newUser = AppUser(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      pinCode: pinCode,
-      color: color,
-    );
-    state = [...state, newUser];
+  Future<void> updateUser(String id, String newName, String newPin) async {
+    await _db.collection('users').doc(id).update({
+      'name': newName,
+      'pinCode': newPin,
+    });
   }
 
-  void updateUser(String id, String newName, String newPin) {
-    state = state.map((u) {
-      if (u.id == id) return u.copyWith(name: newName, pinCode: newPin);
-      return u;
-    }).toList();
-  }
-
-  void deleteUser(String id) {
-    state = state.where((u) => u.id != id).toList();
+  Future<void> deleteUser(String id) async {
+    await _db.collection('users').doc(id).delete();
   }
 }
-
-final usersProvider = NotifierProvider<UsersNotifier, List<AppUser>>(() => UsersNotifier());

@@ -32,7 +32,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final inventory = ref.watch(inventoryProvider);
+    final inventoryAsync = ref.watch(inventoryProvider);
+
+    if (inventoryAsync is AsyncLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+    }
+
+    final inventory = inventoryAsync.value ?? [];
     
     final baseList = _activeFilter == 'Running low' 
         ? inventory.where((item) => item.isRunningLow).toList() 
@@ -145,12 +151,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           ),
           Row(
             children: [
-              IconButton(icon: const Icon(Icons.remove, size: 16), onPressed: () => ref.read(inventoryProvider.notifier).updateQuantity(item.id, -1)),
+              IconButton(icon: const Icon(Icons.remove, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, -1)),
               SizedBox(width: 60, child: Text('${item.quantity} ${item.unit}', textAlign: TextAlign.center, style: GoogleFonts.dmMono(fontSize: 14))),
-              IconButton(icon: const Icon(Icons.add, size: 16), onPressed: () => ref.read(inventoryProvider.notifier).updateQuantity(item.id, 1)),
+              IconButton(icon: const Icon(Icons.add, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, 1)),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.red),
-                onPressed: () => ref.read(inventoryProvider.notifier).removeItem(item.id),
+                onPressed: () => ref.read(inventoryControllerProvider).removeItem(item.id),
               ),
             ],
           ),
@@ -213,7 +219,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   if (_newItemNameCtrl.text.isNotEmpty) {
                     final qty = int.tryParse(_newItemQtyCtrl.text) ?? 1;
                     final threshold = int.tryParse(_newItemThresholdCtrl.text) ?? 1;
-                    ref.read(inventoryProvider.notifier).addItem(_newItemNameCtrl.text, 'Pantry', qty, 'pcs', threshold);
+                    ref.read(inventoryControllerProvider).addItem(_newItemNameCtrl.text, 'Pantry', qty, 'pcs', threshold);
                     
                     setState(() {
                        _newItemNameCtrl.clear();

@@ -3,24 +3,38 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
+import '../models/user_model.dart';
 import '../providers/budget_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/meals_provider.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
-import '../models/user_model.dart';
 
 class OverviewScreen extends ConsumerWidget {
   const OverviewScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final budgetState = ref.watch(budgetProvider);
-    final inventory = ref.watch(inventoryProvider);
-    final mealPlan = ref.watch(mealPlanProvider);
-    final recipes = ref.watch(recipesProvider);
-    final chores = ref.watch(cleaningProvider);
-    final users = ref.watch(usersProvider);
+    final budgetAsync = ref.watch(budgetStateProvider);
+    final inventoryAsync = ref.watch(inventoryProvider);
+    final mealPlanAsync = ref.watch(mealPlanProvider);
+    final recipesAsync = ref.watch(recipesProvider);
+    final choresAsync = ref.watch(cleaningProvider);
+    final usersAsync = ref.watch(usersProvider);
+
+    // Показываем лоадер, пока данные синхронизируются с облаком
+    if (budgetAsync is AsyncLoading || inventoryAsync is AsyncLoading || 
+        mealPlanAsync is AsyncLoading || recipesAsync is AsyncLoading || 
+        choresAsync is AsyncLoading || usersAsync is AsyncLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+    }
+
+    final budgetState = budgetAsync.value!;
+    final inventory = inventoryAsync.value!;
+    final mealPlan = mealPlanAsync.value!;
+    final recipes = recipesAsync.value!;
+    final chores = choresAsync.value!;
+    final users = usersAsync.value!;
 
     final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
     final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
@@ -30,7 +44,7 @@ class OverviewScreen extends ConsumerWidget {
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
 
     final todaysPlan = mealPlan.firstWhere(
-      (plan) => plan.day == 'MON', 
+      (plan) => plan.day == 'MON', // В реальном приложении здесь будет логика текущего дня
       orElse: () => mealPlan.first,
     );
     final todaysRecipe = todaysPlan.recipeId != null 
@@ -224,7 +238,6 @@ class OverviewScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       ...chores.map((chore) {
-                        final users = ref.watch(usersProvider);
                         final user = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '?', pinCode: '', color: AppTheme.textLight));
 
                         return Padding(
@@ -235,7 +248,7 @@ class OverviewScreen extends ConsumerWidget {
                                 value: chore.isDone,
                                 activeColor: AppTheme.mossGreen,
                                 onChanged: (_) {
-                                  ref.read(cleaningProvider.notifier).toggleStatus(chore.id);
+                                  ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
                                 },
                               ),
                               Expanded(

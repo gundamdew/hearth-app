@@ -5,6 +5,7 @@ import '../theme.dart';
 import '../models/budget_models.dart';
 import '../providers/budget_provider.dart';
 import '../providers/users_provider.dart';
+import '../providers/auth_provider.dart'; // НОВЫЙ ИМПОРТ
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -33,9 +34,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
     if (title.isNotEmpty && amount > 0 && _selectedAssignee != null) {
       if (_transactionType == 'Expense' && _selectedCategory != null) {
-        ref.read(budgetProvider.notifier).addExpense(title, amount, _selectedCategory!, _selectedAssignee!);
+        ref.read(budgetControllerProvider).addExpense(title, amount, _selectedCategory!, _selectedAssignee!);
       } else if (_transactionType == 'Income') {
-        ref.read(budgetProvider.notifier).addIncome(title, amount, _selectedAssignee!);
+        ref.read(budgetControllerProvider).addIncome(title, amount, _selectedAssignee!);
       }
       
       _titleController.clear();
@@ -60,7 +61,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           ElevatedButton(
             onPressed: () {
               final newLimit = double.tryParse(controller.text) ?? cat.limit;
-              ref.read(budgetProvider.notifier).updateCategoryLimit(cat.name, newLimit);
+              ref.read(budgetControllerProvider).updateCategoryLimit(cat.id, newLimit);
               Navigator.pop(context);
             },
             child: const Text('Save'),
@@ -72,11 +73,23 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final budgetState = ref.watch(budgetProvider);
-    final users = ref.watch(usersProvider);
-    final debtMessage = ref.read(budgetProvider.notifier).calculateDebt(users);
+    final budgetAsync = ref.watch(budgetStateProvider);
+    final usersAsync = ref.watch(usersProvider);
+    final currentUser = ref.watch(currentUserProvider); // Получаем текущего пользователя
 
-    if (users.isNotEmpty && (_selectedAssignee == null || !users.any((u) => u.name == _selectedAssignee))) {
+    if (budgetAsync is AsyncLoading || usersAsync is AsyncLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+    }
+
+    final budgetState = budgetAsync.value!;
+    final users = usersAsync.value!;
+    
+    final debtMessage = calculateDebt(budgetState.expenses, users);
+
+    // Интеллектуальный выбор пользователя: ставим того, кто вошел по PIN
+    if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
+      _selectedAssignee = currentUser.name;
+    } else if (_selectedAssignee == null && users.isNotEmpty) {
       _selectedAssignee = users.first.name;
     }
 

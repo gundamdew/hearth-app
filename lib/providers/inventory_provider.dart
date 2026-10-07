@@ -1,41 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../models/inventory_item.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/inventory_item.dart';
 
-class InventoryNotifier extends Notifier<List<InventoryItem>> {
-  @override
-  List<InventoryItem> build() {
-    return [
-      InventoryItem(id: '1', name: 'Pasta', location: 'Pantry', quantity: 3, unit: 'boxes', lowStockThreshold: 1),
-      InventoryItem(id: '2', name: 'Rice', location: 'Pantry', quantity: 2, unit: 'kg', lowStockThreshold: 1),
-      InventoryItem(id: '3', name: 'Canned tomatoes', location: 'Pantry', quantity: 4, unit: 'cans', lowStockThreshold: 1),
-      InventoryItem(id: '5', name: 'Eggs', location: 'Fridge', quantity: 8, unit: 'pcs', lowStockThreshold: 6),
-    ];
-  }
+final inventoryProvider = StreamProvider<List<InventoryItem>>((ref) {
+  return FirebaseFirestore.instance.collection('inventory').snapshots().map(
+    (snapshot) => snapshot.docs.map((doc) => InventoryItem.fromFirestore(doc.data(), doc.id)).toList()
+  );
+});
 
-  void updateQuantity(String id, int delta) {
-    state = state.map((item) {
-      if (item.id == id) {
-        return item.copyWith(quantity: (item.quantity + delta).clamp(0, 999));
-      }
-      return item;
-    }).toList();
-  }
+final inventoryControllerProvider = Provider((ref) => InventoryController());
 
-  void removeItem(String id) {
-    state = state.where((item) => item.id != id).toList();
-  }
+class InventoryController {
+  final _db = FirebaseFirestore.instance;
 
-  void addItem(String name, String location, int quantity, String unit, int threshold) {
-    final newItem = InventoryItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      location: location,
-      quantity: quantity,
-      unit: unit,
-      lowStockThreshold: threshold,
+  Future<void> addItem(String name, String location, int quantity, String unit, int threshold) async {
+    final item = InventoryItem(
+      id: '', name: name, location: location, quantity: quantity, unit: unit, lowStockThreshold: threshold
     );
-    state = [...state, newItem];
+    await _db.collection('inventory').add(item.toMap());
+  }
+
+  Future<void> updateQuantity(String id, int currentQty, int delta) async {
+    final newQty = (currentQty + delta).clamp(0, 999);
+    await _db.collection('inventory').doc(id).update({'quantity': newQty});
+  }
+
+  Future<void> removeItem(String id) async {
+    await _db.collection('inventory').doc(id).delete();
   }
 }
-
-final inventoryProvider = NotifierProvider<InventoryNotifier, List<InventoryItem>>(() => InventoryNotifier());

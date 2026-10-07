@@ -21,4 +21,25 @@ class AppUser {
       color: color ?? this.color,
     );
   }
+
+  // Для отправки в Firebase
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'pinCode': pinCode,
+      // ignore: deprecated_member_use
+      'color': color.value, 
+    };
+  }
+
+  // Для чтения из Firebase
+  factory AppUser.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return AppUser(
+      id: documentId,
+      name: map['name'] ?? 'Unknown',
+      pinCode: map['pinCode'] ?? '0000',
+      // ignore: deprecated_member_use
+      color: Color(map['color'] ?? 0xFFB3C5B8), 
+    );
+  }
 }

@@ -39,12 +39,11 @@ class SettingsScreen extends ConsumerWidget {
               onPressed: () {
                 if (nameController.text.isNotEmpty && pinController.text.length >= 4) {
                   if (user == null) {
-                    // Генерируем случайный цвет для новых пользователей
                     final colors = [AppTheme.amber, Colors.blueGrey, Colors.teal, Colors.indigo];
                     final randomColor = colors[DateTime.now().millisecondsSinceEpoch % colors.length];
-                    ref.read(usersProvider.notifier).addUser(nameController.text, pinController.text, randomColor);
+                    ref.read(usersControllerProvider).addUser(nameController.text, pinController.text, randomColor);
                   } else {
-                    ref.read(usersProvider.notifier).updateUser(user.id, nameController.text, pinController.text);
+                    ref.read(usersControllerProvider).updateUser(user.id, nameController.text, pinController.text);
                   }
                   Navigator.pop(context);
                 }
@@ -59,7 +58,13 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final users = ref.watch(usersProvider);
+    final usersAsync = ref.watch(usersProvider);
+
+    if (usersAsync is AsyncLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+    }
+
+    final users = usersAsync.value ?? [];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +107,7 @@ class SettingsScreen extends ConsumerWidget {
                       IconButton(icon: const Icon(Icons.edit, color: AppTheme.textLight), onPressed: () => _showUserDialog(context, ref, user)),
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: AppTheme.red),
-                        onPressed: () => ref.read(usersProvider.notifier).deleteUser(user.id),
+                        onPressed: () => ref.read(usersControllerProvider).deleteUser(user.id),
                       ),
                     ],
                   ),

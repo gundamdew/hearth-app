@@ -5,7 +5,6 @@ class InventoryItem {
   final int quantity;
   final String unit;
   final int lowStockThreshold;
-  final String? expirationInfo; // Опциональное поле для "expires in 2w"
 
   InventoryItem({
     required this.id,
@@ -14,7 +13,6 @@ class InventoryItem {
     required this.quantity,
     required this.unit,
     required this.lowStockThreshold,
-    this.expirationInfo,
   });
 
   bool get isRunningLow => quantity <= lowStockThreshold;
@@ -26,7 +24,6 @@ class InventoryItem {
     int? quantity,
     String? unit,
     int? lowStockThreshold,
-    String? expirationInfo,
   }) {
     return InventoryItem(
       id: id ?? this.id,
@@ -35,7 +32,27 @@ class InventoryItem {
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
-      expirationInfo: expirationInfo ?? this.expirationInfo,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'location': location,
+      'quantity': quantity,
+      'unit': unit,
+      'lowStockThreshold': lowStockThreshold,
+    };
+  }
+
+  factory InventoryItem.fromFirestore(Map<String, dynamic> map, String documentId) {
+    return InventoryItem(
+      id: documentId,
+      name: map['name'] ?? '',
+      location: map['location'] ?? 'General',
+      quantity: map['quantity']?.toInt() ?? 0,
+      unit: map['unit'] ?? 'pcs',
+      lowStockThreshold: map['lowStockThreshold']?.toInt() ?? 1,
     );
   }
 }

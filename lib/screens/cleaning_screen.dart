@@ -6,6 +6,7 @@ import '../models/chore.dart';
 import '../models/user_model.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
+import '../providers/auth_provider.dart'; // НОВЫЙ ИМПОРТ
 
 class CleaningScreen extends ConsumerStatefulWidget {
   const CleaningScreen({super.key});
@@ -31,7 +32,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     final category = _categoryController.text.trim();
     
     if (name.isNotEmpty && _selectedAssignee != null) {
-      ref.read(cleaningProvider.notifier).addChore(name, category.isEmpty ? 'General' : category, _selectedAssignee!);
+      ref.read(cleaningControllerProvider).addChore(name, category.isEmpty ? 'General' : category, _selectedAssignee!);
       _taskController.clear();
       _categoryController.clear();
       FocusScope.of(context).unfocus();
@@ -40,9 +41,22 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chores = ref.watch(cleaningProvider);
-    final users = ref.watch(usersProvider);
+    final choresAsync = ref.watch(cleaningProvider);
+    final usersAsync = ref.watch(usersProvider);
+    final currentUser = ref.watch(currentUserProvider); // Получаем текущего пользователя
+
+    if (choresAsync is AsyncLoading || usersAsync is AsyncLoading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+    }
+
+    final chores = choresAsync.value ?? [];
+    final users = usersAsync.value ?? [];
     final userNames = users.map((u) => u.name).toList();
+
+    // Авто-назначение на активную сессию
+    if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
+      _selectedAssignee = currentUser.name;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,11 +77,11 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () => ref.read(cleaningProvider.notifier).balanceLoad(userNames),
+                  onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames),
                   child: const Text('Balance load'),
                 ),
                 TextButton(
-                  onPressed: () => ref.read(cleaningProvider.notifier).swapAndNewWeek(userNames),
+                  onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames),
                   child: const Text('Swap & new week'),
                 ),
               ],
@@ -90,7 +104,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                   child: ListView.separated(
                     itemCount: chores.length,
                     separatorBuilder: (context, index) => Divider(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                    itemBuilder: (context, index) => _buildChoreRow(context, chores[index], userNames),
+                    itemBuilder: (context, index) => _buildChoreRow(context, chores[index], userNames, users),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -133,8 +147,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     );
   }
 
-  Widget _buildChoreRow(BuildContext context, Chore chore, List<String> availableUsers) {
-    final users = ref.watch(usersProvider);
+  Widget _buildChoreRow(BuildContext context, Chore chore, List<String> availableUsers, List<AppUser> users) {
     final userColor = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '', pinCode: '', color: AppTheme.textLight)).color;
 
     return Padding(
@@ -157,7 +170,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: GestureDetector(
-                onTap: () => ref.read(cleaningProvider.notifier).changeAssignee(chore.id, availableUsers),
+                onTap: () => ref.read(cleaningControllerProvider).changeAssignee(chore.id, chore.assignee, availableUsers),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: userColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
@@ -166,8 +179,8 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
               ),
             ),
           ),
-          Checkbox(value: chore.isDone, activeColor: AppTheme.mossGreen, onChanged: (_) => ref.read(cleaningProvider.notifier).toggleStatus(chore.id)),
-          IconButton(icon: const Icon(Icons.delete_outline, color: AppTheme.red, size: 20), onPressed: () => ref.read(cleaningProvider.notifier).deleteChore(chore.id)),
+          Checkbox(value: chore.isDone, activeColor: AppTheme.mossGreen, onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone)),
+          IconButton(icon: const Icon(Icons.delete_outline, color: AppTheme.red, size: 20), onPressed: () => ref.read(cleaningControllerProvider).deleteChore(chore.id)),
         ],
       ),
     );

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Цветовая палитра
   static const Color cream = Color(0xFFF7F5F0);
   static const Color mossGreen = Color(0xFF374936);
   static const Color terracotta = Color(0xFFE4A99B);
@@ -18,30 +17,12 @@ class AppTheme {
   static ThemeData get lightTheme {
     final baseTextTheme = ThemeData.light().textTheme;
     final textTheme = baseTextTheme.copyWith(
-      displayLarge: GoogleFonts.libreBaskerville(
-        color: textDark,
-        fontWeight: FontWeight.w400,
-      ),
-      displayMedium: GoogleFonts.libreBaskerville(
-        color: textDark,
-        fontWeight: FontWeight.w400,
-      ),
-      headlineLarge: GoogleFonts.libreBaskerville(
-        color: textDark,
-        fontWeight: FontWeight.w400,
-      ),
-      headlineMedium: GoogleFonts.libreBaskerville(
-        color: textDark,
-        fontWeight: FontWeight.w400,
-      ),
-      // DM Mono для цифр, где это будет необходимо
-      displaySmall: GoogleFonts.dmMono(
-        color: textDark,
-      ),
-    ).apply(
-      bodyColor: textDark,
-      displayColor: textDark,
-    );
+      displayLarge: GoogleFonts.libreBaskerville(color: textDark, fontWeight: FontWeight.w400),
+      displayMedium: GoogleFonts.libreBaskerville(color: textDark, fontWeight: FontWeight.w400),
+      headlineLarge: GoogleFonts.libreBaskerville(color: textDark, fontWeight: FontWeight.w400),
+      headlineMedium: GoogleFonts.libreBaskerville(color: textDark, fontWeight: FontWeight.w400),
+      displaySmall: GoogleFonts.dmMono(color: textDark),
+    ).apply(bodyColor: textDark, displayColor: textDark);
 
     return ThemeData(
       scaffoldBackgroundColor: cream,
@@ -57,9 +38,7 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: textDark,
-          textStyle: GoogleFonts.instrumentSans(
-            fontWeight: FontWeight.w500,
-          ),
+          textStyle: GoogleFonts.instrumentSans(fontWeight: FontWeight.w600),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -67,23 +46,33 @@ class AppTheme {
           backgroundColor: mossGreen,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          textStyle: GoogleFonts.instrumentSans(
-            fontWeight: FontWeight.w500,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.instrumentSans(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
       cardTheme: CardThemeData(
         color: cardBackground,
-        elevation: 0,
+        elevation: 4,
+        shadowColor: textDark.withValues(alpha: 0.05),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: textLight.withValues(alpha: 0.05)),
         ),
-        // Легкая тень, как в макетах
-        shadowColor: Colors.black.withValues(alpha: 0.04),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: cardBackground,
+        hintStyle: TextStyle(color: textLight.withValues(alpha: 0.6), fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: textLight.withValues(alpha: 0.15)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: mossGreen, width: 1.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }
