@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/user_model.dart';
+import '../models/meal_models.dart';
+import '../models/budget_models.dart'; // ДОБАВЛЕН ИМПОРТ МОДЕЛИ БЮДЖЕТА
 import '../providers/budget_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/meals_provider.dart';
@@ -22,19 +24,24 @@ class OverviewScreen extends ConsumerWidget {
     final choresAsync = ref.watch(cleaningProvider);
     final usersAsync = ref.watch(usersProvider);
 
-    // Показываем лоадер, пока данные синхронизируются с облаком
-    if (budgetAsync is AsyncLoading || inventoryAsync is AsyncLoading || 
-        mealPlanAsync is AsyncLoading || recipesAsync is AsyncLoading || 
-        choresAsync is AsyncLoading || usersAsync is AsyncLoading) {
+    if (budgetAsync.isLoading || inventoryAsync.isLoading || mealPlanAsync.isLoading || 
+        recipesAsync.isLoading || choresAsync.isLoading || usersAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
 
-    final budgetState = budgetAsync.value!;
-    final inventory = inventoryAsync.value!;
-    final mealPlan = mealPlanAsync.value!;
-    final recipes = recipesAsync.value!;
-    final chores = choresAsync.value!;
-    final users = usersAsync.value!;
+    if (budgetAsync.hasError) return Center(child: Text('Budget error: ${budgetAsync.error}'));
+    if (inventoryAsync.hasError) return Center(child: Text('Inventory error: ${inventoryAsync.error}'));
+    if (mealPlanAsync.hasError) return Center(child: Text('Meals error: ${mealPlanAsync.error}'));
+    if (recipesAsync.hasError) return Center(child: Text('Recipes error: ${recipesAsync.error}'));
+    if (choresAsync.hasError) return Center(child: Text('Chores error: ${choresAsync.error}'));
+    if (usersAsync.hasError) return Center(child: Text('Users error: ${usersAsync.error}'));
+
+    final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
+    final inventory = inventoryAsync.value ?? [];
+    final mealPlan = mealPlanAsync.value ?? [];
+    final recipes = recipesAsync.value ?? [];
+    final chores = choresAsync.value ?? [];
+    final users = usersAsync.value ?? [];
 
     final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
     final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
@@ -43,13 +50,20 @@ class OverviewScreen extends ConsumerWidget {
 
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
 
+    // ВОЗВРАТ К СТАРОЙ ЛОГИКЕ (day вместо date)
     final todaysPlan = mealPlan.firstWhere(
-      (plan) => plan.day == 'MON', // В реальном приложении здесь будет логика текущего дня
-      orElse: () => mealPlan.first,
+      (plan) => plan.day == 'MON',
+      orElse: () => MealPlan(id: 'temp', day: 'MON', recipeId: null),
     );
-    final todaysRecipe = todaysPlan.recipeId != null 
-        ? recipes.firstWhere((r) => r.id == todaysPlan.recipeId) 
-        : null;
+    
+    Recipe? todaysRecipe;
+    if (todaysPlan.recipeId != null) {
+      final matches = recipes.where((r) => r.id == todaysPlan.recipeId);
+      if (matches.isNotEmpty) {
+        todaysRecipe = matches.first;
+      }
+    }
+    
     final plannedDinnersCount = mealPlan.where((p) => p.recipeId != null).length;
 
     final headerNames = users.isEmpty 

@@ -5,7 +5,7 @@ import '../theme.dart';
 import '../models/budget_models.dart';
 import '../providers/budget_provider.dart';
 import '../providers/users_provider.dart';
-import '../providers/auth_provider.dart'; // НОВЫЙ ИМПОРТ
+import '../providers/auth_provider.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -75,18 +75,20 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   Widget build(BuildContext context) {
     final budgetAsync = ref.watch(budgetStateProvider);
     final usersAsync = ref.watch(usersProvider);
-    final currentUser = ref.watch(currentUserProvider); // Получаем текущего пользователя
+    final currentUser = ref.watch(currentUserProvider); 
 
-    if (budgetAsync is AsyncLoading || usersAsync is AsyncLoading) {
+    if (budgetAsync.isLoading || usersAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
 
-    final budgetState = budgetAsync.value!;
-    final users = usersAsync.value!;
+    if (budgetAsync.hasError) return Center(child: Text('Error loading budget: ${budgetAsync.error}'));
+    if (usersAsync.hasError) return Center(child: Text('Error loading users: ${usersAsync.error}'));
+
+    final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
+    final users = usersAsync.value ?? [];
     
     final debtMessage = calculateDebt(budgetState.expenses, users);
 
-    // Интеллектуальный выбор пользователя: ставим того, кто вошел по PIN
     if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
       _selectedAssignee = currentUser.name;
     } else if (_selectedAssignee == null && users.isNotEmpty) {

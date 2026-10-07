@@ -4,21 +4,26 @@ import '../models/budget_models.dart';
 import '../models/user_model.dart';
 
 final expensesProvider = StreamProvider<List<Expense>>((ref) {
-  return FirebaseFirestore.instance.collection('budget_transactions')
-    .where('type', isEqualTo: 'expense')
-    .orderBy('date', descending: true)
-    .snapshots().map(
-    (snapshot) => snapshot.docs.map((doc) => Expense.fromFirestore(doc.data(), doc.id)).toList()
-  );
+  return FirebaseFirestore.instance.collection('budget_transactions').snapshots().map((snapshot) {
+    // Локальная фильтрация и сортировка избавляет от необходимости создавать составные индексы в Firebase
+    final exps = snapshot.docs
+        .where((doc) => doc.data()['type'] == 'expense')
+        .map((doc) => Expense.fromFirestore(doc.data(), doc.id))
+        .toList();
+    exps.sort((a, b) => b.date.compareTo(a.date));
+    return exps;
+  });
 });
 
 final incomesProvider = StreamProvider<List<Income>>((ref) {
-  return FirebaseFirestore.instance.collection('budget_transactions')
-    .where('type', isEqualTo: 'income')
-    .orderBy('date', descending: true)
-    .snapshots().map(
-    (snapshot) => snapshot.docs.map((doc) => Income.fromFirestore(doc.data(), doc.id)).toList()
-  );
+  return FirebaseFirestore.instance.collection('budget_transactions').snapshots().map((snapshot) {
+    final incs = snapshot.docs
+        .where((doc) => doc.data()['type'] == 'income')
+        .map((doc) => Income.fromFirestore(doc.data(), doc.id))
+        .toList();
+    incs.sort((a, b) => b.date.compareTo(a.date));
+    return incs;
+  });
 });
 
 final categoriesProvider = StreamProvider<List<BudgetCategory>>((ref) {
@@ -32,13 +37,13 @@ final budgetStateProvider = Provider<AsyncValue<BudgetState>>((ref) {
   final incomes = ref.watch(incomesProvider);
   final categories = ref.watch(categoriesProvider);
 
-  if (expenses is AsyncLoading || incomes is AsyncLoading || categories is AsyncLoading) {
+  if (expenses.isLoading || incomes.isLoading || categories.isLoading) {
     return const AsyncLoading();
   }
 
-  if (expenses is AsyncError || incomes is AsyncError || categories is AsyncError) {
-    return AsyncError('Error loading budget', StackTrace.current);
-  }
+  if (expenses.hasError) return AsyncError(expenses.error!, expenses.stackTrace!);
+  if (incomes.hasError) return AsyncError(incomes.error!, incomes.stackTrace!);
+  if (categories.hasError) return AsyncError(categories.error!, categories.stackTrace!);
 
   final cats = categories.value ?? [];
   final exps = expenses.value ?? [];
