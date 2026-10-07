@@ -211,13 +211,17 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: _selectedAssignee,
-                            decoration: InputDecoration(enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)))),
-                            items: users.map<DropdownMenuItem<String>>((u) {
-                              return DropdownMenuItem<String>(value: u.name, child: Text(u.name));
-                            }).toList(),
-                            onChanged: (val) => setState(() => _selectedAssignee = val),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            decoration: BoxDecoration(color: AppTheme.cardBackground, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: _selectedAssignee,
+                                items: users.map((u) => DropdownMenuItem(value: u.name, child: Text(u.name))).toList(),
+                                onChanged: (val) => setState(() => _selectedAssignee = val),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -232,14 +236,18 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     ),
                     if (_transactionType == 'Expense') ...[
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String?>(
-                        value: _selectedCategory,
-                        hint: const Text('Category'),
-                        decoration: InputDecoration(enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)))),
-                        items: budgetState.categories.map<DropdownMenuItem<String?>>((c) {
-                          return DropdownMenuItem<String?>(value: c.name, child: Text(c.name));
-                        }).toList(),
-                        onChanged: (val) => setState(() => _selectedCategory = val),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(color: AppTheme.cardBackground, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            isExpanded: true,
+                            value: _selectedCategory,
+                            hint: const Text('Category'),
+                            items: budgetState.categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
+                            onChanged: (val) => setState(() => _selectedCategory = val),
+                          ),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),

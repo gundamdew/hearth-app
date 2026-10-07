@@ -6,7 +6,7 @@ import '../models/chore.dart';
 import '../models/user_model.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
-import '../providers/auth_provider.dart'; // НОВЫЙ ИМПОРТ
+import '../providers/auth_provider.dart';
 
 class CleaningScreen extends ConsumerStatefulWidget {
   const CleaningScreen({super.key});
@@ -43,9 +43,9 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
   Widget build(BuildContext context) {
     final choresAsync = ref.watch(cleaningProvider);
     final usersAsync = ref.watch(usersProvider);
-    final currentUser = ref.watch(currentUserProvider); // Получаем текущего пользователя
+    final currentUser = ref.watch(currentUserProvider); 
 
-    if (choresAsync is AsyncLoading || usersAsync is AsyncLoading) {
+    if (choresAsync.isLoading || usersAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
 
@@ -53,7 +53,6 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     final users = usersAsync.value ?? [];
     final userNames = users.map((u) => u.name).toList();
 
-    // Авто-назначение на активную сессию
     if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
       _selectedAssignee = currentUser.name;
     }
@@ -150,38 +149,64 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
   Widget _buildChoreRow(BuildContext context, Chore chore, List<String> availableUsers, List<AppUser> users) {
     final userColor = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '', pinCode: '', color: AppTheme.textLight)).color;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(chore.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, decoration: chore.isDone ? TextDecoration.lineThrough : null, color: chore.isDone ? AppTheme.textLight : AppTheme.textDark)),
-                const SizedBox(height: 4),
-                Text(chore.category, style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-              ],
+    return Dismissible(
+      key: Key(chore.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppTheme.red.withValues(alpha: 0.1),
+        child: const Icon(Icons.delete_outline, color: AppTheme.red),
+      ),
+      onDismissed: (direction) {
+        ref.read(cleaningControllerProvider).deleteChore(chore.id);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${chore.name} deleted'),
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: AppTheme.amber,
+              onPressed: () {
+                ref.read(cleaningControllerProvider).addChore(chore.name, chore.category, chore.assignee);
+              },
             ),
           ),
-          Expanded(
-            flex: 1,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: GestureDetector(
-                onTap: () => ref.read(cleaningControllerProvider).changeAssignee(chore.id, chore.assignee, availableUsers),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: userColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                  child: Text(chore.assignee, style: TextStyle(color: userColor, fontSize: 12, fontWeight: FontWeight.w600)),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(chore.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, decoration: chore.isDone ? TextDecoration.lineThrough : null, color: chore.isDone ? AppTheme.textLight : AppTheme.textDark)),
+                  const SizedBox(height: 4),
+                  Text(chore.category, style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 1,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () => ref.read(cleaningControllerProvider).changeAssignee(chore.id, chore.assignee, availableUsers),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: userColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                    child: Text(chore.assignee, style: TextStyle(color: userColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
                 ),
               ),
             ),
-          ),
-          Checkbox(value: chore.isDone, activeColor: AppTheme.mossGreen, onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone)),
-          IconButton(icon: const Icon(Icons.delete_outline, color: AppTheme.red, size: 20), onPressed: () => ref.read(cleaningControllerProvider).deleteChore(chore.id)),
-        ],
+            Checkbox(value: chore.isDone, activeColor: AppTheme.mossGreen, onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone)),
+            const SizedBox(width: 12),
+          ],
+        ),
       ),
     );
   }

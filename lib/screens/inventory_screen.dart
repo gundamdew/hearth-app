@@ -34,7 +34,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   Widget build(BuildContext context) {
     final inventoryAsync = ref.watch(inventoryProvider);
 
-    if (inventoryAsync is AsyncLoading) {
+    if (inventoryAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
 
@@ -121,46 +121,69 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   }
 
   Widget _buildInventoryItemRow(BuildContext context, WidgetRef ref, InventoryItem item) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.1)))),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                    if (item.isRunningLow) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: AppTheme.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                        child: const Text('LOW', style: TextStyle(color: AppTheme.red, fontSize: 10, fontWeight: FontWeight.bold)),
-                      ),
-                    ]
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('Restock below ${item.lowStockThreshold}', style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-              ],
+    return Dismissible(
+      key: Key(item.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: AppTheme.red.withValues(alpha: 0.1),
+        child: const Icon(Icons.delete_outline, color: AppTheme.red),
+      ),
+      onDismissed: (direction) {
+        ref.read(inventoryControllerProvider).removeItem(item.id);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${item.name} removed from inventory'),
+            action: SnackBarAction(
+              label: 'UNDO',
+              textColor: AppTheme.amber,
+              onPressed: () {
+                ref.read(inventoryControllerProvider).addItem(item.name, item.location, item.quantity, item.unit, item.lowStockThreshold);
+              },
             ),
           ),
-          Row(
-            children: [
-              IconButton(icon: const Icon(Icons.remove, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, -1)),
-              SizedBox(width: 60, child: Text('${item.quantity} ${item.unit}', textAlign: TextAlign.center, style: GoogleFonts.dmMono(fontSize: 14))),
-              IconButton(icon: const Icon(Icons.add, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, 1)),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20, color: AppTheme.red),
-                onPressed: () => ref.read(inventoryControllerProvider).removeItem(item.id),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.1)))),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                      if (item.isRunningLow) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: AppTheme.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
+                          child: const Text('LOW', style: TextStyle(color: AppTheme.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ]
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Restock below ${item.lowStockThreshold}', style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+            Row(
+              children: [
+                IconButton(icon: const Icon(Icons.remove, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, -1)),
+                SizedBox(width: 60, child: Text('${item.quantity} ${item.unit}', textAlign: TextAlign.center, style: GoogleFonts.dmMono(fontSize: 14))),
+                IconButton(icon: const Icon(Icons.add, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, 1)),
+                const SizedBox(width: 12),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
