@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class RecipeIngredient {
   final String inventoryId;
   final String name;
@@ -61,21 +63,21 @@ class Recipe {
 
 class MealPlan {
   final String id;
-  final String day;
+  final DateTime date;
   final String? recipeId;
   final bool isCooked;
 
   MealPlan({
     required this.id,
-    required this.day,
+    required this.date,
     this.recipeId,
     this.isCooked = false,
   });
 
-  MealPlan copyWith({String? id, String? day, String? recipeId, bool? isCooked}) {
+  MealPlan copyWith({String? id, DateTime? date, String? recipeId, bool? isCooked}) {
     return MealPlan(
       id: id ?? this.id,
-      day: day ?? this.day,
+      date: date ?? this.date,
       recipeId: recipeId ?? this.recipeId,
       isCooked: isCooked ?? this.isCooked,
     );
@@ -83,7 +85,7 @@ class MealPlan {
 
   Map<String, dynamic> toMap() {
     return {
-      'day': day,
+      'date': Timestamp.fromDate(date),
       'recipeId': recipeId,
       'isCooked': isCooked,
     };
@@ -92,7 +94,7 @@ class MealPlan {
   factory MealPlan.fromFirestore(Map<String, dynamic> map, String documentId) {
     return MealPlan(
       id: documentId,
-      day: map['day'] ?? 'MON',
+      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       recipeId: map['recipeId'],
       isCooked: map['isCooked'] ?? false,
     );

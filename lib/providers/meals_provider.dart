@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import '../models/meal_models.dart';
 
 final recipesProvider = StreamProvider<List<Recipe>>((ref) {
@@ -9,7 +10,14 @@ final recipesProvider = StreamProvider<List<Recipe>>((ref) {
 });
 
 final mealPlanProvider = StreamProvider<List<MealPlan>>((ref) {
-  return FirebaseFirestore.instance.collection('meal_plans').orderBy('day').snapshots().map(
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  
+  return FirebaseFirestore.instance.collection('meal_plans')
+    .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
+    .orderBy('date')
+    .limit(14)
+    .snapshots().map(
     (snapshot) => snapshot.docs.map((doc) => MealPlan.fromFirestore(doc.data(), doc.id)).toList()
   );
 });
@@ -23,17 +31,26 @@ class MealsController {
   MealsController(this._ref);
 
   Future<void> initializeMealPlans() async {
-    final snap = await _db.collection('meal_plans').limit(1).get();
-    if (snap.docs.isEmpty) {
-      final batch = _db.batch();
-      final days = ['1_MON', '2_TUE', '3_WED', '4_THU', '5_FRI', '6_SAT', '7_SUN'];
-      for (var dayData in days) {
-        final parts = dayData.split('_');
-        final doc = _db.collection('meal_plans').doc(parts[0]);
-        batch.set(doc, {'day': parts[1], 'recipeId': null, 'isCooked': false});
+    final batch = _db.batch();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    for (int i = 0; i < 14; i++) {
+      final targetDate = today.add(Duration(days: i));
+      final id = DateFormat('yyyy-MM-dd').format(targetDate);
+      
+      final docRef = _db.collection('meal_plans').doc(id);
+      final docSnap = await docRef.get();
+      
+      if (!docSnap.exists) {
+        batch.set(docRef, {
+          'date': Timestamp.fromDate(targetDate),
+          'recipeId': null,
+          'isCooked': false,
+        });
       }
-      await batch.commit();
     }
+    await batch.commit();
   }
 
   Future<void> addRecipe(String name, int prepTime, List<RecipeIngredient> ingredients) async {
@@ -51,8 +68,10 @@ class MealsController {
 
   Future<void> markCooked(String mealPlanId, String recipeId) async {
     final recipesVal = _ref.read(recipesProvider).value ?? [];
-    final recipe = recipesVal.firstWhere((r) => r.id == recipeId);
-
+    final matches = recipesVal.where((r) => r.id == recipeId);
+    if (matches.isEmpty) return;
+    
+    final recipe = matches.first;
     final batch = _db.batch();
 
     for (var ingredient in recipe.ingredients) {

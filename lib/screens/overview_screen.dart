@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/user_model.dart';
 import '../models/meal_models.dart';
-import '../models/budget_models.dart'; // ДОБАВЛЕН ИМПОРТ МОДЕЛИ БЮДЖЕТА
+import '../models/budget_models.dart';
 import '../providers/budget_provider.dart';
 import '../providers/inventory_provider.dart';
 import '../providers/meals_provider.dart';
@@ -50,10 +50,11 @@ class OverviewScreen extends ConsumerWidget {
 
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
 
-    // ВОЗВРАТ К СТАРОЙ ЛОГИКЕ (day вместо date)
+    // Извлечение расписания конкретно на сегодняшний день
+    final todayId = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final todaysPlan = mealPlan.firstWhere(
-      (plan) => plan.day == 'MON',
-      orElse: () => MealPlan(id: 'temp', day: 'MON', recipeId: null),
+      (plan) => plan.id == todayId,
+      orElse: () => MealPlan(id: todayId, date: DateTime.now(), recipeId: null),
     );
     
     Recipe? todaysRecipe;
@@ -165,7 +166,7 @@ class OverviewScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        '$plannedDinnersCount of 7 dinners planned',
+                        '$plannedDinnersCount of 14 dinners planned',
                         style: const TextStyle(color: AppTheme.textLight, fontSize: 14),
                       ),
                     ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/meal_models.dart';
 import '../providers/meals_provider.dart';
@@ -81,7 +82,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(recipe.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-                  subtitle: Text('${recipe.ingredients.length} ingredients · ${recipe.prepTime ?? 30} min', style: TextStyle(color: AppTheme.textLight)),
+                  subtitle: Text('${recipe.ingredients.length} ingredients · ${recipe.prepTime ?? 30} min', style: const TextStyle(color: AppTheme.textLight)),
                   trailing: const Icon(Icons.add_circle_outline, color: AppTheme.mossGreen),
                   onTap: () {
                     ref.read(mealsControllerProvider).assignRecipe(mealPlanId, recipe.id);
@@ -102,9 +103,13 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
     final recipesAsync = ref.watch(recipesProvider);
     final inventoryAsync = ref.watch(inventoryProvider);
 
-    if (mealPlanAsync is AsyncLoading || recipesAsync is AsyncLoading || inventoryAsync is AsyncLoading) {
+    if (mealPlanAsync.isLoading || recipesAsync.isLoading || inventoryAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
+
+    if (mealPlanAsync.hasError) return Center(child: Text('Meals error: ${mealPlanAsync.error}'));
+    if (recipesAsync.hasError) return Center(child: Text('Recipes error: ${recipesAsync.error}'));
+    if (inventoryAsync.hasError) return Center(child: Text('Inventory error: ${inventoryAsync.error}'));
 
     final mealPlan = mealPlanAsync.value ?? [];
     final recipes = recipesAsync.value ?? [];
@@ -117,7 +122,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text('Weekly Menu', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28)),
+            Text('Upcoming Menu', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28)),
             Text(
               '${mealPlan.where((p) => p.recipeId != null).length} PLANNED', 
               style: GoogleFonts.instrumentSans(fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight, fontSize: 12)
@@ -133,9 +138,11 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [BoxShadow(color: AppTheme.textDark.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: mealPlan.map((plan) => Expanded(child: _buildInteractiveDayCard(context, ref, plan, recipes))).toList(),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: mealPlan.map((plan) => _buildInteractiveDayCard(context, ref, plan, recipes)).toList(),
+            ),
           ),
         ),
         
@@ -189,11 +196,23 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
 
     final hasRecipe = recipe != null;
 
+    final dayName = DateFormat('EEEE').format(plan.date).toUpperCase();
+    final dateStr = DateFormat('MMM d').format(plan.date).toUpperCase();
+    
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+
+    String displayLabel = dayName;
+    if (plan.date.isAtSameMomentAs(today)) displayLabel = 'TODAY';
+    else if (plan.date.isAtSameMomentAs(tomorrow)) displayLabel = 'TOMORROW';
+
     return GestureDetector(
       onTap: () {
         if (!hasRecipe) _showRecipePicker(context, ref, plan.id, recipes);
       },
       child: Container(
+        width: 140,
         height: 140,
         margin: const EdgeInsets.symmetric(horizontal: 8),
         padding: const EdgeInsets.all(16),
@@ -211,9 +230,18 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  plan.day, 
-                  style: GoogleFonts.instrumentSans(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: hasRecipe ? AppTheme.mossGreen : AppTheme.textLight)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayLabel, 
+                      style: GoogleFonts.instrumentSans(fontSize: 13, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: hasRecipe ? AppTheme.mossGreen : AppTheme.textDark)
+                    ),
+                    Text(
+                      dateStr, 
+                      style: GoogleFonts.instrumentSans(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 1.0, color: AppTheme.textLight)
+                    ),
+                  ],
                 ),
                 if (hasRecipe)
                   GestureDetector(
@@ -226,8 +254,8 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             if (hasRecipe) ...[
               Text(
                 recipe.name,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, height: 1.2),
-                maxLines: 3,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, height: 1.2),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 8),
