@@ -1,9 +1,10 @@
+// lib/screens/overview_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
-import '../models/user_model.dart';
 import '../models/meal_models.dart';
 import '../models/budget_models.dart';
 import '../providers/budget_provider.dart';
@@ -11,13 +12,17 @@ import '../providers/inventory_provider.dart';
 import '../providers/meals_provider.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
+import '../providers/auth_provider.dart';
+import '../widgets/hearth_ui.dart';
 
 class OverviewScreen extends ConsumerWidget {
   const OverviewScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isMobile = MediaQuery.sizeOf(context).width < 800;
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 1024;
+    final isTablet = width >= 600 && width < 1024;
 
     final budgetAsync = ref.watch(budgetStateProvider);
     final inventoryAsync = ref.watch(inventoryProvider);
@@ -25,18 +30,12 @@ class OverviewScreen extends ConsumerWidget {
     final recipesAsync = ref.watch(recipesProvider);
     final choresAsync = ref.watch(cleaningProvider);
     final usersAsync = ref.watch(usersProvider);
+    final currentUser = ref.watch(currentUserProvider);
 
     if (budgetAsync.isLoading || inventoryAsync.isLoading || mealPlanAsync.isLoading || 
         recipesAsync.isLoading || choresAsync.isLoading || usersAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+      return const Center(child: CircularProgressIndicator(color: AppTheme.moss));
     }
-
-    if (budgetAsync.hasError) return Center(child: Text('Budget error: ${budgetAsync.error}'));
-    if (inventoryAsync.hasError) return Center(child: Text('Inventory error: ${inventoryAsync.error}'));
-    if (mealPlanAsync.hasError) return Center(child: Text('Meals error: ${mealPlanAsync.error}'));
-    if (recipesAsync.hasError) return Center(child: Text('Recipes error: ${recipesAsync.error}'));
-    if (choresAsync.hasError) return Center(child: Text('Chores error: ${choresAsync.error}'));
-    if (usersAsync.hasError) return Center(child: Text('Users error: ${usersAsync.error}'));
 
     final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
     final inventory = inventoryAsync.value ?? [];
@@ -45,19 +44,24 @@ class OverviewScreen extends ConsumerWidget {
     final chores = choresAsync.value ?? [];
     final users = usersAsync.value ?? [];
 
+    // Financial calculations
     final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
     final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
-    final remainingBudget = totalIncome - totalSpent;
-    final budgetProgress = totalIncome > 0 ? (totalSpent / totalIncome).clamp(0.0, 1.0) : 0.0;
+    final totalLimit = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.limit);
+    final baseBudget = totalLimit > 0 ? totalLimit : totalIncome;
+    final remainingBudget = (baseBudget - totalSpent).clamp(-999999.0, 999999.0);
+    final ratio = baseBudget > 0 ? (totalSpent / baseBudget) : 0.0;
 
-    final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
+    // Running low items
+    final lowItems = inventory.where((item) => item.isRunningLow).toList();
 
+    // Today's meal
     final todayId = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final todaysPlan = mealPlan.firstWhere(
       (plan) => plan.id == todayId,
       orElse: () => MealPlan(id: todayId, date: DateTime.now(), recipeId: null),
     );
-    
+
     Recipe? todaysRecipe;
     if (todaysPlan.recipeId != null) {
       final matches = recipes.where((r) => r.id == todaysPlan.recipeId);
@@ -65,146 +69,398 @@ class OverviewScreen extends ConsumerWidget {
         todaysRecipe = matches.first;
       }
     }
-    
     final plannedDinnersCount = mealPlan.where((p) => p.recipeId != null).length;
 
-    final headerNames = users.isEmpty 
-        ? 'NO RESIDENTS' 
-        : users.map((u) => u.name.toUpperCase()).join(' & ');
-    final dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now()).toUpperCase();
+    // Chores done count
+    final choresDoneCount = chores.where((c) => c.isDone).length;
 
-    Widget budgetCard = _buildMetricCard(
-      context, 
-      'LEFT TO SPEND THIS MONTH', 
-      '${remainingBudget.toStringAsFixed(0)} USD', 
-      LinearProgressIndicator(
-        value: budgetProgress,
-        backgroundColor: AppTheme.textLight.withValues(alpha: 0.1),
-        valueColor: AlwaysStoppedAnimation(budgetProgress > 0.9 ? AppTheme.red : AppTheme.mossGreen),
-        minHeight: 4,
-        borderRadius: BorderRadius.circular(2),
-      )
-    );
+    final dateFormatted = DateFormat('EEEE, MMMM d').format(DateTime.now());
+    final residentsSubtitle = users.map((u) => u.name).join(' & ');
 
-    Widget dinnerCard = _buildMetricCard(
-      context, 
-      'TONIGHT\'S DINNER', 
-      todaysRecipe?.name ?? 'Nothing planned yet', 
-      Text('$plannedDinnersCount of 14 dinners planned', style: const TextStyle(color: AppTheme.textLight, fontSize: 14)),
-      isItalic: todaysRecipe == null
-    );
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Subheader line
+          Text(
+            residentsSubtitle.isNotEmpty ? '$residentsSubtitle · $dateFormatted'.toUpperCase() : dateFormatted.toUpperCase(),
+            style: AppTheme.microStyle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
 
-    Widget lowStockCard = _buildListCard(
-      context, 
-      'RUNNING LOW', 
-      '${runningLowItems.length} items', 
-      runningLowItems.isEmpty 
-        ? const Text('Everything is stocked up!', style: TextStyle(color: AppTheme.textLight))
-        : Column(
-            children: runningLowItems.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  Text('${item.quantity} ${item.unit}', style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight)),
-                ],
-              ),
-            )).toList(),
-          )
-    );
+          // Main Title
+          Text(
+            'Good evening, ${currentUser?.name ?? "friend"}.',
+            style: AppTheme.titleStyle(fontSize: isDesktop ? 48 : 34),
+          ),
+          SizedBox(height: isDesktop ? 32 : 24),
 
-    Widget choresCard = _buildListCard(
-      context, 
-      'TODAY\'S CHORES', 
-      '', 
-      Column(
-        children: chores.map((chore) {
-          final user = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '?', pinCode: '', color: AppTheme.textLight));
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Row(
+          // 2x2 Bento Grid or 1 Column Stack
+          if (isDesktop || isTablet) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(
-                  value: chore.isDone,
-                  activeColor: AppTheme.mossGreen,
-                  onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone),
-                ),
                 Expanded(
-                  child: Text(
-                    chore.name,
-                    style: TextStyle(fontSize: 16, decoration: chore.isDone ? TextDecoration.lineThrough : null, color: chore.isDone ? AppTheme.textLight : AppTheme.textDark),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: _buildBudgetCard(context, remainingBudget, totalSpent, baseBudget, totalIncome, ratio),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: user.color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                  child: Text(chore.assignee, style: TextStyle(color: user.color, fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
                 ),
               ],
             ),
-          );
-        }).toList(),
-      )
-    );
-
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$headerNames · $dateStr', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
-          const SizedBox(height: 32),
-          
-          isMobile
-            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [budgetCard, const SizedBox(height: 16), dinnerCard])
-            : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: budgetCard), const SizedBox(width: 24), Expanded(child: dinnerCard)]),
-            
-          const SizedBox(height: 24),
-          
-          isMobile
-            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [lowStockCard, const SizedBox(height: 16), choresCard])
-            : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: lowStockCard), const SizedBox(width: 24), Expanded(child: choresCard)]),
+            const SizedBox(height: 24),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildInventoryCard(context, lowItems),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: _buildChoresCard(context, ref, chores, users, choresDoneCount),
+                ),
+              ],
+            ),
+          ] else ...[
+            _buildBudgetCard(context, remainingBudget, totalSpent, baseBudget, totalIncome, ratio),
+            const SizedBox(height: 16),
+            _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
+            const SizedBox(height: 16),
+            _buildInventoryCard(context, lowItems),
+            const SizedBox(height: 16),
+            _buildChoresCard(context, ref, chores, users, choresDoneCount),
+          ],
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildMetricCard(BuildContext context, String title, String value, Widget bottomWidget, {bool isItalic = false}) {
+  Widget _buildBudgetCard(BuildContext context, double remaining, double spent, double limit, double income, double ratio) {
+    final isDanger = ratio > 0.9;
+
     return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
+      constraints: const BoxConstraints(minHeight: 250),
+      decoration: AppTheme.cardDecoration,
+      padding: const EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('LEFT TO SPEND THIS MONTH', style: AppTheme.microStyle),
+              IconButton(
+                icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.muted),
+                onPressed: () => context.go('/budget'),
+                splashRadius: 18,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
-          Text(value, style: isItalic 
-            ? Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28, fontStyle: FontStyle.italic, color: AppTheme.textLight)
-            : GoogleFonts.dmMono(fontSize: 40, fontWeight: FontWeight.w500, color: AppTheme.textDark)),
+          Text(
+            '\$${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} USD',
+            style: GoogleFonts.dmMono(
+              fontSize: 44,
+              fontWeight: FontWeight.w400,
+              letterSpacing: -1.0,
+              color: isDanger ? AppTheme.danger : AppTheme.ink,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 24),
-          bottomWidget,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HearthProgressBar(value: ratio),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '\$${spent.round()} spent',
+                    style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                  ),
+                  Text(
+                    '${(ratio * 100).round()}% of \$${limit.round()}',
+                    style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Income logged · \$${income.round()} USD',
+                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildListCard(BuildContext context, String title, String subtitle, Widget content) {
+  Widget _buildDinnerCard(BuildContext context, WidgetRef ref, MealPlan plan, Recipe? recipe, int plannedCount) {
+    final hasRecipe = recipe != null;
+
     return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
+      constraints: const BoxConstraints(minHeight: 250),
+      decoration: AppTheme.cardDecoration,
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('TONIGHT\'S DINNER · TODAY', style: AppTheme.microStyle),
+              Text(
+                '$plannedCount of 14 planned',
+                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (hasRecipe) ...[
+            Text(
+              recipe.name,
+              style: AppTheme.titleStyle(fontSize: 30),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${recipe.ingredients.length} ingredients · ${recipe.prepTime ?? 30} min',
+              style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+            ),
+          ] else ...[
+            Text(
+              'Nothing planned yet',
+              style: AppTheme.titleStyle(fontSize: 26, color: AppTheme.muted, fontStyle: FontStyle.italic),
+            ),
+          ],
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (hasRecipe) ...[
+                if (plan.isCooked)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.sage.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check, size: 16, color: AppTheme.moss),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Cooked',
+                          style: GoogleFonts.instrumentSans(
+                            color: AppTheme.moss,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ElevatedButton(
+                    onPressed: () {
+                      ref.read(mealsControllerProvider).markCooked(plan.id, recipe.id);
+                    },
+                    child: const Text('Mark cooked'),
+                  ),
+              ] else ...[
+                OutlinedButton(
+                  onPressed: () => context.go('/meals'),
+                  child: const Text('Plan a dinner'),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInventoryCard(BuildContext context, List<dynamic> lowItems) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 250),
+      decoration: AppTheme.cardDecoration,
+      padding: const EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
-              if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(color: AppTheme.textLight, fontSize: 12)),
+              Text('RUNNING LOW', style: AppTheme.microStyle),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.danger.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${lowItems.length} items',
+                  style: GoogleFonts.dmMono(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.danger,
+                  ),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 24),
-          content,
+          const SizedBox(height: 16),
+          if (lowItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              child: Text(
+                'Everything is stocked.',
+                style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: lowItems.take(5).length,
+              separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+              itemBuilder: (context, index) {
+                final item = lowItems[index];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.danger,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.ink),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Text(
+                        '${item.quantity} ${item.unit}',
+                        style: GoogleFonts.dmMono(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.danger,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => context.go('/inventory'),
+            child: Text(
+              'Open inventory →',
+              style: GoogleFonts.instrumentSans(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.moss,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChoresCard(BuildContext context, WidgetRef ref, List<dynamic> chores, List<dynamic> users, int doneCount) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 250),
+      decoration: AppTheme.cardDecoration,
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('TODAY\'S CHORES', style: AppTheme.microStyle),
+              Text(
+                '$doneCount/${chores.length}',
+                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (chores.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              child: Text(
+                'No chores assigned.',
+                style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: chores.take(5).length,
+              separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+              itemBuilder: (context, index) {
+                final chore = chores[index];
+                final userMatches = users.where((u) => u.name == chore.assignee);
+                final assignedUser = userMatches.isNotEmpty ? userMatches.first : null;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      HearthCheckbox(
+                        checked: chore.isDone,
+                        onChange: () {
+                          ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          chore.name,
+                          style: GoogleFonts.instrumentSans(
+                            fontSize: 14,
+                            color: chore.isDone ? AppTheme.muted : AppTheme.ink,
+                            decoration: chore.isDone ? TextDecoration.lineThrough : null,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ResidentBadge(
+                        name: chore.assignee,
+                        color: assignedUser?.color,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );

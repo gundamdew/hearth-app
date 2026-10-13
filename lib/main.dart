@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
+import 'widgets/hearth_ui.dart';
 import 'screens/budget_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/meals_screen.dart';
@@ -71,6 +72,23 @@ class MainScaffold extends ConsumerWidget {
 
   const MainScaffold({super.key, required this.child, required this.currentPath});
 
+  String _getPageTitle(String path) {
+    switch (path) {
+      case '/budget':
+        return 'Budget';
+      case '/inventory':
+        return 'Inventory';
+      case '/meals':
+        return 'Meals';
+      case '/cleaning':
+        return 'Cleaning';
+      case '/settings':
+        return 'Settings';
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
@@ -79,98 +97,255 @@ class MainScaffold extends ConsumerWidget {
       return const LoginScreen();
     }
 
+    final width = MediaQuery.sizeOf(context).width;
+    final isMobile = width < 600;
+    final isDesktop = width >= 1024;
+    final pageTitle = _getPageTitle(currentPath);
+
+    final navItems = const [
+      (id: 'Overview', path: '/', icon: Icons.home_outlined, activeIcon: Icons.home),
+      (id: 'Budget', path: '/budget', icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet),
+      (id: 'Inventory', path: '/inventory', icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2),
+      (id: 'Meals', path: '/meals', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen),
+      (id: 'Cleaning', path: '/cleaning', icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome),
+    ];
+
+    final horizontalPadding = isDesktop ? 48.0 : (isMobile ? 16.0 : 24.0);
+
     return Scaffold(
-      // SafeArea защищает контент от наложения на "челку" смартфона и системный бар
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              // Уменьшаем отступы для мобильных экранов
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  Text(
-                    'Hearth.',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 36),
-                  ),
-                  // Оборачиваем навигацию в скролл, чтобы она не ломала верстку на смартфонах
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
-                        _NavItem(title: 'Overview', path: '/', currentPath: currentPath),
-                        _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
-                        _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),
-                        _NavItem(title: 'Meals', path: '/meals', currentPath: currentPath),
-                        _NavItem(title: 'Cleaning', path: '/cleaning', currentPath: currentPath),
-                        const SizedBox(width: 16),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2))),
-                          child: Row(
-                            children: [
-                              CircleAvatar(radius: 12, backgroundColor: currentUser.color.withValues(alpha: 0.2), child: Text(currentUser.name[0], style: TextStyle(color: currentUser.color, fontSize: 10, fontWeight: FontWeight.bold))),
-                              const SizedBox(width: 8),
-                              Text(currentUser.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                              const SizedBox(width: 12),
-                              GestureDetector(
-                                onTap: () => ref.read(currentUserProvider.notifier).logout(),
-                                child: const Icon(Icons.logout, size: 16, color: AppTheme.textLight),
-                              )
-                            ],
+      backgroundColor: AppTheme.canvas,
+      body: Container(
+        decoration: AppTheme.canvasGradientDecoration,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // Sticky Top Navigation Header
+              Container(
+                decoration: const BoxDecoration(
+                  color: Color.fromRGBO(247, 245, 240, 0.85),
+                  border: Border(bottom: BorderSide(color: AppTheme.line)),
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1440),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                        vertical: isDesktop ? 16.0 : 12.0,
+                      ),
+                      child: Row(
+                        children: [
+                          // Brand Title
+                          GestureDetector(
+                            onTap: () => context.go('/'),
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Hearth',
+                                    style: AppTheme.titleStyle(fontSize: isDesktop ? 32 : 26),
+                                  ),
+                                  TextSpan(
+                                    text: '.',
+                                    style: AppTheme.titleStyle(fontSize: isDesktop ? 32 : 26, color: AppTheme.terra),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        )
-                      ],
+
+                          // Desktop / Tablet Center Navigation Pills
+                          if (!isMobile) ...[
+                            Expanded(
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(color: AppTheme.line),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: navItems.map((item) {
+                                      final isSelected = currentPath == item.path;
+                                      return GestureDetector(
+                                        onTap: () => context.go(item.path),
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 180),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: isSelected ? AppTheme.moss : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            item.id,
+                                            style: TextStyle(
+                                              color: isSelected ? Colors.white : AppTheme.muted,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            const Spacer(),
+                          ],
+
+                          // Profile Pill
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppTheme.line),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                GestureDetector(
+                                  onTap: () => context.go('/settings'),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      HearthAvatar(
+                                        name: currentUser.name,
+                                        color: currentUser.color,
+                                        size: 30,
+                                      ),
+                                      if (!isMobile) ...[
+                                        const SizedBox(width: 8),
+                                        ConstrainedBox(
+                                          constraints: const BoxConstraints(maxWidth: 120),
+                                          child: Text(
+                                            currentUser.name,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppTheme.ink,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ] else ...[
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.settings_outlined, size: 16, color: AppTheme.muted),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.logout, size: 16, color: AppTheme.muted),
+                                  splashRadius: 16,
+                                  padding: const EdgeInsets.all(4),
+                                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                  tooltip: 'Lock screen',
+                                  onPressed: () => ref.read(currentUserProvider.notifier).logout(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: child,
+
+              // Main Content Area
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1440),
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        isDesktop ? 32.0 : 20.0,
+                        horizontalPadding,
+                        isMobile ? 12.0 : 32.0,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (pageTitle.isNotEmpty && currentPath != '/settings') ...[
+                            Text(
+                              pageTitle,
+                              style: AppTheme.titleStyle(fontSize: isDesktop ? 44 : 32),
+                            ),
+                            SizedBox(height: isDesktop ? 28 : 20),
+                          ],
+                          Expanded(child: child),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
-class _NavItem extends StatelessWidget {
-  final String title;
-  final String path;
-  final String currentPath;
-
-  const _NavItem({required this.title, required this.path, required this.currentPath});
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = currentPath == path;
-    return Padding(
-      // Уменьшен внутренний отступ кнопок навигации
-      padding: const EdgeInsets.only(right: 12.0),
-      child: GestureDetector(
-        onTap: () => context.go(path),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.mossGreen : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isActive ? Colors.white : AppTheme.textLight,
-              fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            ),
+              // Mobile Bottom Navigation Bar (< 600px)
+              if (isMobile)
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Color.fromRGBO(255, 255, 255, 0.92),
+                    border: Border(top: BorderSide(color: AppTheme.line)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: navItems.map((item) {
+                          final isSelected = currentPath == item.path;
+                          return Expanded(
+                            child: GestureDetector(
+                              onTap: () => context.go(item.path),
+                              behavior: HitTestBehavior.opaque,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? AppTheme.sage.withValues(alpha: 0.4) : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Icon(
+                                      isSelected ? item.activeIcon : item.icon,
+                                      size: 18,
+                                      color: isSelected ? AppTheme.moss : AppTheme.muted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.id,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: isSelected ? AppTheme.moss : AppTheme.muted,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),

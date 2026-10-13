@@ -1,3 +1,4 @@
+// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,38 +14,87 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
   AppUser? _selectedUser;
   String _enteredPin = '';
+  bool _isError = false;
+  final TextEditingController _firstNameCtrl = TextEditingController();
+  late AnimationController _shakeController;
 
-  final _nameCtrl = TextEditingController();
-  final _pinCtrl = TextEditingController();
-
-  void _handleKeyPress(String key) {
-    if (_enteredPin.length < 4) {
-      setState(() => _enteredPin += key);
-      if (_enteredPin.length == 4) {
-        if (_enteredPin == _selectedUser!.pinCode) {
-          ref.read(currentUserProvider.notifier).login(_selectedUser!); // ИЗМЕНЕНО
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incorrect PIN', style: TextStyle(color: Colors.white)), backgroundColor: AppTheme.red));
-          setState(() => _enteredPin = '');
-        }
-      }
-    }
-  }
-
-  void _createFirstUser() {
-    if (_nameCtrl.text.isNotEmpty && _pinCtrl.text.length >= 4) {
-      ref.read(usersControllerProvider).addUser(_nameCtrl.text, _pinCtrl.text, AppTheme.terracotta);
-    }
+  @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _pinCtrl.dispose();
+    _firstNameCtrl.dispose();
+    _shakeController.dispose();
     super.dispose();
+  }
+
+  void _handleKeyPress(String key) {
+    if (_selectedUser == null) {
+      return;
+    }
+
+    if (key == 'Cancel') {
+      setState(() {
+        _selectedUser = null;
+        _enteredPin = '';
+        _isError = false;
+      });
+      return;
+    }
+
+    if (key == 'Del') {
+      if (_enteredPin.isNotEmpty) {
+        setState(() {
+          _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+          _isError = false;
+        });
+      }
+      return;
+    }
+
+    if (_enteredPin.length < 4) {
+      setState(() {
+        _enteredPin += key;
+        _isError = false;
+      });
+
+      if (_enteredPin.length == 4) {
+        if (_enteredPin == _selectedUser!.pinCode) {
+          Future.delayed(const Duration(milliseconds: 180), () {
+            if (mounted) {
+              ref.read(currentUserProvider.notifier).login(_selectedUser!);
+            }
+          });
+        } else {
+          setState(() => _isError = true);
+          _shakeController.forward(from: 0.0);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Incorrect PIN', style: TextStyle(color: Colors.white)),
+              backgroundColor: AppTheme.danger,
+              duration: Duration(seconds: 1),
+            ),
+          );
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (mounted) {
+              setState(() {
+                _enteredPin = '';
+                _isError = false;
+              });
+            }
+          });
+        }
+      }
+    }
   }
 
   @override
@@ -52,132 +102,299 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final usersAsync = ref.watch(usersProvider);
 
     return Scaffold(
-      body: Center(
-        child: usersAsync.when(
-          loading: () => const CircularProgressIndicator(color: AppTheme.mossGreen),
-          error: (err, stack) => Text('Error loading users: $err'),
-          data: (users) {
-            if (users.isEmpty) {
-              return _buildFirstUserForm();
-            }
-
-            if (_selectedUser == null) {
-              return _buildUserSelection(users);
-            }
-
-            return _buildPinPad();
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFirstUserForm() {
-    return Container(
-      width: 400,
-      padding: const EdgeInsets.all(48),
-      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(24), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Welcome to Hearth.', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28)),
-          const SizedBox(height: 8),
-          const Text('Let\'s create your first resident profile.', style: TextStyle(color: AppTheme.textLight)),
-          const SizedBox(height: 32),
-          TextField(controller: _nameCtrl, decoration: const InputDecoration(hintText: 'Name')),
-          const SizedBox(height: 16),
-          TextField(controller: _pinCtrl, keyboardType: TextInputType.number, maxLength: 4, obscureText: true, decoration: const InputDecoration(hintText: '4-Digit PIN')),
-          const SizedBox(height: 24),
-          SizedBox(width: double.infinity, child: ElevatedButton(onPressed: _createFirstUser, child: const Text('Create Profile'))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserSelection(List<AppUser> users) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text('Who is using the screen?', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 32)),
-        const SizedBox(height: 48),
-        Wrap(
-          spacing: 32,
-          runSpacing: 32,
-          alignment: WrapAlignment.center,
-          children: users.map((user) => GestureDetector(
-            onTap: () => setState(() {
-              _selectedUser = user;
-              _enteredPin = '';
-            }),
-            child: Column(
-              children: [
-                CircleAvatar(radius: 48, backgroundColor: user.color.withValues(alpha: 0.2), child: Text(user.name[0], style: TextStyle(color: user.color, fontSize: 32, fontWeight: FontWeight.bold))),
-                const SizedBox(height: 16),
-                Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          )).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPinPad() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text('Enter PIN for ${_selectedUser!.name}', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24)),
-        const SizedBox(height: 32),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(4, (index) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: index < _enteredPin.length ? AppTheme.mossGreen : AppTheme.textLight.withValues(alpha: 0.2),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 48),
-        SizedBox(
-          width: 280,
-          child: Wrap(
-            spacing: 24,
-            runSpacing: 24,
-            alignment: WrapAlignment.center,
+      backgroundColor: AppTheme.canvas,
+      body: Container(
+        decoration: AppTheme.canvasGradientDecoration,
+        width: double.infinity,
+        height: double.infinity,
+        child: SafeArea(
+          child: Stack(
             children: [
-              for (var i = 1; i <= 9; i++) _buildPinButton(i.toString()),
-              _buildPinButton('Cancel', isAction: true),
-              _buildPinButton('0'),
-              _buildPinButton('Del', isAction: true),
+              // Top Brand
+              Positioned(
+                top: 24,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Hearth',
+                          style: AppTheme.titleStyle(fontSize: 26),
+                        ),
+                        TextSpan(
+                          text: '.',
+                          style: AppTheme.titleStyle(fontSize: 26, color: AppTheme.terra),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Main Auth Container
+              Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 64),
+                  child: usersAsync.when(
+                    loading: () => const CircularProgressIndicator(color: AppTheme.moss),
+                    error: (err, _) => Text('Error loading users: $err', style: const TextStyle(color: AppTheme.danger)),
+                    data: (users) {
+                      if (_selectedUser == null) {
+                        return _buildResidentPicker(context, users);
+                      }
+                      return _buildPinPad(context, _selectedUser!);
+                    },
+                  ),
+                ),
+              ),
             ],
           ),
-        )
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResidentPicker(BuildContext context, List<AppUser> users) {
+    if (users.isEmpty) {
+      return Container(
+        constraints: const BoxConstraints(maxWidth: 380),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('FIRST RESIDENT', style: AppTheme.microStyle),
+            const SizedBox(height: 6),
+            Text('Set up your household', style: AppTheme.titleStyle(fontSize: 24)),
+            const SizedBox(height: 8),
+            Text(
+              'The database is empty. Create the first resident to begin — you can add others later in Settings.',
+              style: GoogleFonts.instrumentSans(color: AppTheme.muted, fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _firstNameCtrl,
+              decoration: const InputDecoration(hintText: 'Your name'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _firstNameCtrl.text.trim().isEmpty
+                    ? null
+                    : () {
+                        final name = _firstNameCtrl.text.trim();
+                        ref.read(usersControllerProvider).addUser(
+                          name,
+                          '1234',
+                          AppTheme.residentColors[0],
+                        );
+                        _firstNameCtrl.clear();
+                      },
+                child: const Text('Create resident · PIN 1234'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('SHARED HOUSEHOLD', style: AppTheme.microStyle),
+        const SizedBox(height: 8),
+        Text('Who is using the screen?', style: AppTheme.titleStyle(fontSize: 36)),
+        const SizedBox(height: 36),
+        Wrap(
+          spacing: 20,
+          runSpacing: 20,
+          alignment: WrapAlignment.center,
+          children: users.map((user) {
+            return GestureDetector(
+              onTap: () => setState(() {
+                _selectedUser = user;
+                _enteredPin = '';
+                _isError = false;
+              }),
+              child: Container(
+                width: 175,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
+                decoration: AppTheme.cardDecoration,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: user.color,
+                        boxShadow: [
+                          BoxShadow(
+                            color: user.color.withValues(alpha: 0.35),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                        style: GoogleFonts.newsreader(
+                          fontSize: 38,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user.name,
+                      style: AppTheme.titleStyle(fontSize: 20),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.lock_outline, size: 12, color: AppTheme.muted),
+                        const SizedBox(width: 4),
+                        Text(
+                          'PIN protected',
+                          style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }
 
-  Widget _buildPinButton(String label, {bool isAction = false}) {
+  Widget _buildPinPad(BuildContext context, AppUser user) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: user.color,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+            style: GoogleFonts.newsreader(fontSize: 26, color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Enter PIN for ${user.name}', style: AppTheme.titleStyle(fontSize: 28)),
+        const SizedBox(height: 4),
+        Text('Demo PIN · 1234', style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted)),
+        const SizedBox(height: 32),
+
+        // Dots
+        AnimatedBuilder(
+          animation: _shakeController,
+          builder: (context, child) {
+            final offset = _isError ? (1 - _shakeController.value) * 8 * ((_shakeController.value * 4).toInt() % 2 == 0 ? 1 : -1) : 0.0;
+            return Transform.translate(
+              offset: Offset(offset, 0),
+              child: child,
+            );
+          },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(4, (i) {
+              final isFilled = i < _enteredPin.length;
+              final dotColor = _isError ? AppTheme.danger : (isFilled ? AppTheme.moss : Colors.transparent);
+              final borderColor = _isError
+                  ? AppTheme.danger
+                  : (isFilled ? AppTheme.moss : AppTheme.muted.withValues(alpha: 0.35));
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: dotColor,
+                  border: Border.all(color: borderColor, width: 1.5),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 36),
+
+        // 3x4 keypad
+        Container(
+          constraints: const BoxConstraints(maxWidth: 270),
+          child: GridView.count(
+            crossAxisCount: 3,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 1.0,
+            children: [
+              '1', '2', '3',
+              '4', '5', '6',
+              '7', '8', '9',
+              'Cancel', '0', 'Del'
+            ].map((key) => _buildKeyButton(key)).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKeyButton(String key) {
+    final isAction = key == 'Cancel' || key == 'Del';
+
     return GestureDetector(
-      onTap: () {
-        if (label == 'Cancel') {
-          setState(() => _selectedUser = null);
-        } else if (label == 'Del') {
-          setState(() => _enteredPin = _enteredPin.isNotEmpty ? _enteredPin.substring(0, _enteredPin.length - 1) : '');
-        } else {
-          _handleKeyPress(label);
-        }
-      },
+      onTap: () => _handleKeyPress(key),
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: isAction ? Colors.transparent : AppTheme.cardBackground, border: isAction ? null : Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
-        child: Center(
-          child: Text(label, style: GoogleFonts.instrumentSans(fontSize: isAction ? 16 : 24, fontWeight: isAction ? FontWeight.w600 : FontWeight.w500, color: isAction ? AppTheme.textLight : AppTheme.textDark)),
+        decoration: isAction
+            ? null
+            : BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+                border: Border.all(color: AppTheme.line),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color.fromRGBO(30, 32, 29, 0.03),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+        alignment: Alignment.center,
+        child: Text(
+          key,
+          style: isAction
+              ? GoogleFonts.instrumentSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.muted,
+                )
+              : GoogleFonts.dmMono(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w400,
+                  color: AppTheme.ink,
+                ),
         ),
       ),
     );

@@ -1,9 +1,11 @@
+// lib/screens/inventory_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
+import '../widgets/hearth_ui.dart';
 
 class InventoryScreen extends ConsumerStatefulWidget {
   const InventoryScreen({super.key});
@@ -13,397 +15,623 @@ class InventoryScreen extends ConsumerStatefulWidget {
 }
 
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _filter = 'All';
   String _searchQuery = '';
-  String _activeFilter = 'All';
-  
-  final TextEditingController _newItemNameCtrl = TextEditingController();
-  final TextEditingController _newItemQtyCtrl = TextEditingController(text: '1');
-  final TextEditingController _newItemUnitCtrl = TextEditingController(text: 'szt.');
-  final TextEditingController _newItemThresholdCtrl = TextEditingController(text: '1');
-  String _selectedLocation = 'Pantry';
+
+  final TextEditingController _nameCtrl = TextEditingController();
+  final TextEditingController _qtyCtrl = TextEditingController(text: '1');
+  final TextEditingController _minCtrl = TextEditingController(text: '1');
+  String _selectedLoc = 'Pantry';
+  String _selectedUnit = 'szt.';
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _newItemNameCtrl.dispose();
-    _newItemQtyCtrl.dispose();
-    _newItemUnitCtrl.dispose();
-    _newItemThresholdCtrl.dispose();
+    _searchCtrl.dispose();
+    _nameCtrl.dispose();
+    _qtyCtrl.dispose();
+    _minCtrl.dispose();
     super.dispose();
   }
 
-  void _showBulkImportDialog(BuildContext context, List<InventoryItem> existingItems) {
-    final textCtrl = TextEditingController();
+  void _showBulkImportModal(BuildContext context, List<InventoryItem> existingItems) {
+    final textCtrl = TextEditingController(
+      text: '* Kurczak – 2 szt.\n* Masło – 6 szt.\n- Passata pomidorowa - 3 op.\n• Szpinak – 1 op.',
+    );
 
-    showDialog(
+    showHearthModal(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            'Import Shopping List',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 22),
-          ),
-          content: SizedBox(
-            width: 450,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Paste your message below (format: "* Product – 2 szt."):',
-                  style: TextStyle(color: AppTheme.textLight, fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: textCtrl,
-                  maxLines: 10,
-                  decoration: InputDecoration(
-                    hintText: ' * Płyn uniwersalny – 1 szt.\n * Kurczak – 2 szt.\n * Masło – 6 szt.',
-                    hintStyle: TextStyle(color: AppTheme.textLight.withValues(alpha: 0.5)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.playlist_add_check, size: 18),
-              label: const Text('Import Items'),
-              onPressed: () async {
-                final rawText = textCtrl.text.trim();
-                if (rawText.isEmpty) {
-                  return;
-                }
+      title: 'Paste Shopping List',
+      sub: 'Bulk import',
+      child: StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final rawText = textCtrl.text;
+          final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+          final regex = RegExp(r'^[\s\*\-\•\d\.]*(.+?)\s*[\–\-\—\:]\s*(\d+)\s*(.*)$');
 
-                Navigator.pop(dialogContext);
-                final count = await ref
-                    .read(inventoryControllerProvider)
-                    .bulkAddFromText(rawText, existingItems);
+          final parsedRows = lines.map((line) {
+            final match = regex.firstMatch(line);
+            if (match != null) {
+              final name = match.group(1)?.trim() ?? '';
+              final qty = int.tryParse(match.group(2) ?? '1') ?? 1;
+              var unit = match.group(3)?.trim() ?? 'szt.';
+              if (unit.isEmpty) unit = 'szt.';
+              final isExisting = existingItems.any((i) => i.name.toLowerCase() == name.toLowerCase());
+              return (isValid: true, line: line, name: name, qty: qty, unit: unit, isExisting: isExisting);
+            }
+            return (isValid: false, line: line, name: '', qty: 0, unit: '', isExisting: false);
+          }).toList();
 
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        count > 0
-                            ? 'Successfully imported/updated $count items!'
-                            : 'No matching items found. Check the format.',
+          final validCount = parsedRows.where((r) => r.isValid).length;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Paste a message from chat. One item per line — Name – qty unit.',
+                style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: textCtrl,
+                maxLines: 6,
+                style: GoogleFonts.dmMono(fontSize: 13),
+                decoration: const InputDecoration(
+                  hintText: '* Kurczak – 2 szt.\n* Masło – 6 szt.',
+                ),
+                onChanged: (_) => setModalState(() {}),
+              ),
+              const SizedBox(height: 16),
+              Text('PREVIEW · $validCount RECOGNISED', style: AppTheme.microStyle),
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 180),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.line),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: parsedRows.length,
+                  separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                  itemBuilder: (context, index) {
+                    final row = parsedRows[index];
+                    if (row.isValid) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                row.name,
+                                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: row.isExisting
+                                    ? AppTheme.sage.withValues(alpha: 0.4)
+                                    : AppTheme.amber.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                row.isExisting ? 'UPDATE' : 'NEW',
+                                style: GoogleFonts.instrumentSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: row.isExisting ? AppTheme.moss : AppTheme.amber,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '+${row.qty} ${row.unit}',
+                              style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.ink),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 14, color: AppTheme.danger),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              row.line,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.muted,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                      backgroundColor: count > 0 ? AppTheme.mossGreen : AppTheme.red,
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        );
-      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: validCount == 0
+                      ? null
+                      : () async {
+                          Navigator.pop(modalCtx);
+                          final count = await ref
+                              .read(inventoryControllerProvider)
+                              .bulkAddFromText(textCtrl.text.trim(), existingItems);
+
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('$count items restocked/updated'),
+                                backgroundColor: AppTheme.moss,
+                              ),
+                            );
+                          }
+                        },
+                  child: const Text('Update stock'),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.sizeOf(context).width < 800;
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 1024;
+
     final inventoryAsync = ref.watch(inventoryProvider);
 
     if (inventoryAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+      return const Center(child: CircularProgressIndicator(color: AppTheme.moss));
     }
 
     final inventory = inventoryAsync.value ?? [];
-    
-    final baseList = _activeFilter == 'Running low' 
-        ? inventory.where((item) => item.isRunningLow).toList() 
-        : inventory;
+    final lowCount = inventory.where((i) => i.isRunningLow).length;
 
-    final filteredInventory = baseList.where((item) => item.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    final shoppingList = inventory.where((item) => item.isRunningLow).toList();
+    final filtered = inventory.where((item) {
+      final matchesFilter = _filter == 'All' || item.isRunningLow;
+      final matchesQuery = item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+      return matchesFilter && matchesQuery;
+    }).toList();
 
-    final Map<String, List<InventoryItem>> groupedInventory = {};
-    for (var item in filteredInventory) {
-      groupedInventory.putIfAbsent(item.location, () => []).add(item);
-    }
+    const locations = ['Fridge', 'Pantry', 'Household'];
 
-    Widget filterAndSearch = isMobile
-      ? Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip('All'),
-                  _buildFilterChip('Running low', count: shoppingList.length),
-                  _buildPasteListButton(context, inventory),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _searchController,
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search items...',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)),
-                ),
-              ),
-            ),
-          ],
-        )
-      : Row(
-          children: [
-            _buildFilterChip('All'),
-            _buildFilterChip('Running low', count: shoppingList.length),
-            const SizedBox(width: 8),
-            _buildPasteListButton(context, inventory),
-            const Spacer(),
-            SizedBox(
-              width: 250,
-              child: TextField(
-                controller: _searchController,
-                onChanged: (value) => setState(() => _searchQuery = value),
-                decoration: InputDecoration(
-                  hintText: 'Search items...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-
-    Widget inventoryList = ListView.builder(
-      shrinkWrap: isMobile,
-      physics: isMobile ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
-      itemCount: groupedInventory.keys.length,
-      itemBuilder: (context, index) {
-        final location = groupedInventory.keys.elementAt(index);
-        final items = groupedInventory[location]!;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12, top: 16),
-              child: Text(
-                location.toUpperCase(),
-                style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textLight),
-              ),
-            ),
-            ...items.map((item) => _buildInventoryItemRow(context, ref, item)),
-          ],
-        );
-      },
-    );
-
-    Widget leftPanel = Column(
+    final leftPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        filterAndSearch,
-        const SizedBox(height: 32),
-        isMobile ? inventoryList : Expanded(child: inventoryList),
-      ],
-    );
-
-    Widget rightPanel = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        // Filter bar & Search
+        Wrap(
+          spacing: 8,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Text('Add an item', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20)),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _newItemNameCtrl,
-              decoration: InputDecoration(
-                hintText: 'Item name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.3)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedLocation,
-                  items: ['Pantry', 'Fridge', 'Household']
-                      .map((loc) => DropdownMenuItem(value: loc, child: Text(loc)))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() => _selectedLocation = val);
-                    }
-                  },
+            // All Pill
+            GestureDetector(
+              onTap: () => setState(() => _filter = 'All'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: _filter == 'All' ? AppTheme.moss : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: _filter == 'All' ? null : Border.all(color: AppTheme.line),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'All',
+                  style: TextStyle(
+                    color: _filter == 'All' ? Colors.white : AppTheme.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _newItemQtyCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Qty',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
+
+            // Running low Pill
+            GestureDetector(
+              onTap: () => setState(() => _filter = 'Running low'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                height: 40,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: _filter == 'Running low' ? AppTheme.moss : Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  border: _filter == 'Running low' ? null : Border.all(color: AppTheme.line),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _newItemUnitCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Unit',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Running low',
+                      style: TextStyle(
+                        color: _filter == 'Running low' ? Colors.white : AppTheme.muted,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _newItemThresholdCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Min',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _filter == 'Running low'
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : AppTheme.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$lowCount',
+                        style: GoogleFonts.dmMono(
+                          fontSize: 12,
+                          color: _filter == 'Running low' ? Colors.white : AppTheme.danger,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                if (_newItemNameCtrl.text.isNotEmpty) {
-                  final qty = int.tryParse(_newItemQtyCtrl.text) ?? 1;
-                  final threshold = int.tryParse(_newItemThresholdCtrl.text) ?? 1;
-                  final unit = _newItemUnitCtrl.text.trim().isEmpty ? 'szt.' : _newItemUnitCtrl.text.trim();
-                  ref.read(inventoryControllerProvider).addItem(
-                    _newItemNameCtrl.text.trim(),
-                    _selectedLocation,
-                    qty,
-                    unit,
-                    threshold,
-                  );
-                  setState(() {
-                    _newItemNameCtrl.clear();
-                    _newItemQtyCtrl.text = '1';
-                    _newItemUnitCtrl.text = 'szt.';
-                    _newItemThresholdCtrl.text = '1';
-                  });
-                  FocusScope.of(context).unfocus();
-                }
-              }, 
-              child: const Text('Add to inventory'),
+
+            // Paste list Button
+            OutlinedButton.icon(
+              onPressed: () => _showBulkImportModal(context, inventory),
+              icon: const Icon(Icons.paste, size: 16, color: AppTheme.moss),
+              label: const Text('Paste list', style: TextStyle(color: AppTheme.moss, fontWeight: FontWeight.w500)),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: AppTheme.moss.withValues(alpha: 0.3)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              ),
+            ),
+
+            // Search Bar
+            SizedBox(
+              width: 200,
+              height: 40,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() => _searchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search items',
+                  prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.muted),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppTheme.line)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: const BorderSide(color: AppTheme.line)),
+                ),
+              ),
             ),
           ],
         ),
-      ),
-    );
+        const SizedBox(height: 24),
 
-    return isMobile 
-      ? SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [leftPanel, const SizedBox(height: 48), rightPanel]))
-      : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 7, child: leftPanel), const SizedBox(width: 48), Expanded(flex: 3, child: rightPanel)]);
-  }
+        // Grouped Items by Location
+        if (filtered.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 64.0),
+            child: Center(
+              child: Text(
+                'No items match.',
+                style: AppTheme.titleStyle(fontSize: 22, color: AppTheme.muted, fontStyle: FontStyle.italic),
+              ),
+            ),
+          )
+        else
+          ...locations.map((loc) {
+            final locItems = filtered.where((i) => i.location == loc).toList();
+            if (locItems.isEmpty) return const SizedBox.shrink();
 
-  Widget _buildPasteListButton(BuildContext context, List<InventoryItem> inventory) {
-    return OutlinedButton.icon(
-      onPressed: () => _showBulkImportDialog(context, inventory),
-      icon: const Icon(Icons.content_paste_go, size: 16, color: AppTheme.mossGreen),
-      label: const Text('Paste list', style: TextStyle(color: AppTheme.mossGreen, fontWeight: FontWeight.w600)),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: AppTheme.mossGreen),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      ),
-    );
-  }
-
-  Widget _buildInventoryItemRow(BuildContext context, WidgetRef ref, InventoryItem item) {
-    return Dismissible(
-      key: Key(item.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: AppTheme.red.withValues(alpha: 0.1),
-        child: const Icon(Icons.delete_outline, color: AppTheme.red),
-      ),
-      onDismissed: (direction) {
-        ref.read(inventoryControllerProvider).removeItem(item.id);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.1)))),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(child: Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500))),
-                      if (item.isRunningLow) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: AppTheme.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                          child: const Text('LOW', style: TextStyle(color: AppTheme.red, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                      ]
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0, left: 4),
+                    child: Row(
+                      children: [
+                        Text(loc.toUpperCase(), style: AppTheme.microStyle),
+                        const SizedBox(width: 6),
+                        Text('${locItems.length}', style: GoogleFonts.dmMono(fontSize: 11, color: AppTheme.muted)),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text('Restock below ${item.lowStockThreshold}', style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
+                  Container(
+                    decoration: AppTheme.cardDecoration,
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: locItems.length,
+                      separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                      itemBuilder: (context, index) {
+                        final item = locItems[index];
+                        final isLow = item.isRunningLow;
+
+                        return Dismissible(
+                          key: Key(item.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            color: AppTheme.danger,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                                SizedBox(width: 6),
+                                Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                          onDismissed: (_) {
+                            ref.read(inventoryControllerProvider).removeItem(item.id);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Removed ${item.name}'),
+                                backgroundColor: AppTheme.ink,
+                                action: SnackBarAction(
+                                  label: 'UNDO',
+                                  textColor: AppTheme.sage,
+                                  onPressed: () {
+                                    ref.read(inventoryControllerProvider).addItem(
+                                      item.name,
+                                      item.location,
+                                      item.quantity,
+                                      item.unit,
+                                      item.lowStockThreshold,
+                                    );
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              item.name,
+                                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          if (isLow) ...[
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.danger.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                'LOW',
+                                                style: GoogleFonts.instrumentSans(
+                                                  color: AppTheme.danger,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.8,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Restock below ${item.lowStockThreshold}',
+                                        style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.canvas,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(color: AppTheme.line),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove, size: 14),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                        onPressed: () {
+                                          ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, -1);
+                                        },
+                                      ),
+                                      SizedBox(
+                                        width: 60,
+                                        child: Text(
+                                          '${item.quantity} ${item.unit}',
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.dmMono(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: isLow ? AppTheme.danger : AppTheme.ink,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add, size: 14),
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                        onPressed: () {
+                                          ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, 1);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ],
               ),
+            );
+          }),
+      ],
+    );
+
+    final rightPanel = FormCard(
+      sub: 'Stock',
+      title: 'Add an item',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Item name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(hintText: 'e.g. Pomidory koktajlowe'),
+          ),
+          const SizedBox(height: 16),
+          Text('Location', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          const SizedBox(height: 6),
+          HearthSelect<String>(
+            value: _selectedLoc,
+            items: locations,
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedLoc = val);
+            },
+            labelBuilder: (l) => l,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Qty', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      style: GoogleFonts.dmMono(fontSize: 14),
+                      decoration: const InputDecoration(hintText: '1'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Unit', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    const SizedBox(height: 6),
+                    HearthSelect<String>(
+                      value: _selectedUnit,
+                      items: const ['szt.', 'op.', 'porcja'],
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedUnit = val);
+                      },
+                      labelBuilder: (u) => u,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Min', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _minCtrl,
+                      keyboardType: TextInputType.number,
+                      style: GoogleFonts.dmMono(fontSize: 14),
+                      decoration: const InputDecoration(hintText: '1'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () {
+                final name = _nameCtrl.text.trim();
+                if (name.isNotEmpty) {
+                  final qty = int.tryParse(_qtyCtrl.text) ?? 1;
+                  final min = int.tryParse(_minCtrl.text) ?? 1;
+                  ref.read(inventoryControllerProvider).addItem(
+                    name,
+                    _selectedLoc,
+                    qty,
+                    _selectedUnit,
+                    min,
+                  );
+                  _nameCtrl.clear();
+                  _qtyCtrl.text = '1';
+                  _minCtrl.text = '1';
+                  FocusScope.of(context).unfocus();
+                }
+              },
+              child: const Text('Add to inventory'),
             ),
-            Row(
-              children: [
-                IconButton(icon: const Icon(Icons.remove, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, -1)),
-                SizedBox(width: 75, child: Text('${item.quantity} ${item.unit}', textAlign: TextAlign.center, style: GoogleFonts.dmMono(fontSize: 14))),
-                IconButton(icon: const Icon(Icons.add, size: 16), onPressed: () => ref.read(inventoryControllerProvider).updateQuantity(item.id, item.quantity, 1)),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-  }
 
-  Widget _buildFilterChip(String label, {int? count}) {
-    final isActive = _activeFilter == label;
-    return GestureDetector(
-      onTap: () => setState(() => _activeFilter = label),
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppTheme.textDark : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: isActive ? null : Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)),
-        ),
-        child: Text(count != null ? '$label  $count' : label, style: TextStyle(color: isActive ? Colors.white : AppTheme.textLight)),
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: leftPanel),
+                const SizedBox(width: 32),
+                Expanded(flex: 5, child: rightPanel),
+              ],
+            ),
+          ] else ...[
+            leftPanel,
+            const SizedBox(height: 32),
+            rightPanel,
+          ],
+          const SizedBox(height: 48),
+        ],
       ),
     );
   }

@@ -49,3 +49,7 @@ app.*.map.json
 
 # Firebase cache
 .firebase/
+
+# UI Reference prototypes
+_figma_ui_reference/
+reference_ui/

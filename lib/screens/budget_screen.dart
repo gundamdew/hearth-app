@@ -1,11 +1,15 @@
+// lib/screens/budget_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme.dart';
 import '../models/budget_models.dart';
+import '../models/user_model.dart';
 import '../providers/budget_provider.dart';
 import '../providers/users_provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/hearth_ui.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
   const BudgetScreen({super.key});
@@ -15,228 +19,487 @@ class BudgetScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetScreenState extends ConsumerState<BudgetScreen> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _descCtrl = TextEditingController();
+  final TextEditingController _amountCtrl = TextEditingController();
+  String _selectedType = 'Expense';
   String? _selectedCategory;
   String? _selectedAssignee;
-  String _transactionType = 'Expense';
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
+    _descCtrl.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
-  void _submitTransaction() {
-    final title = _titleController.text.trim();
-    final amount = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
+  void _submitTransaction(List<BudgetCategory> categories, List<AppUser> users) {
+    final title = _descCtrl.text.trim();
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0.0;
+    final assignee = _selectedAssignee ?? (users.isNotEmpty ? users.first.name : '');
 
-    if (title.isNotEmpty && amount > 0 && _selectedAssignee != null) {
-      if (_transactionType == 'Expense' && _selectedCategory != null) {
-        ref.read(budgetControllerProvider).addExpense(title, amount, _selectedCategory!, _selectedAssignee!);
-      } else if (_transactionType == 'Income') {
-        ref.read(budgetControllerProvider).addIncome(title, amount, _selectedAssignee!);
+    if (title.isNotEmpty && amount > 0 && assignee.isNotEmpty) {
+      if (_selectedType == 'Expense') {
+        final cat = _selectedCategory ?? (categories.isNotEmpty ? categories.first.name : 'General');
+        ref.read(budgetControllerProvider).addExpense(title, amount, cat, assignee);
+      } else {
+        ref.read(budgetControllerProvider).addIncome(title, amount, assignee);
       }
-      
-      _titleController.clear();
-      _amountController.clear();
+
+      _descCtrl.clear();
+      _amountCtrl.clear();
       FocusScope.of(context).unfocus();
     }
   }
 
+  void _showEditLimitDialog(BuildContext context, BudgetCategory cat) {
+    final ctrl = TextEditingController(text: cat.limit.round().toString());
+    showHearthModal(
+      context: context,
+      title: 'Edit ${cat.name} Limit',
+      sub: 'Budget limit',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Set monthly limit for ${cat.name} (USD):',
+            style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'e.g. 500'),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: () {
+                final newLimit = double.tryParse(ctrl.text.trim()) ?? cat.limit;
+                ref.read(budgetControllerProvider).updateCategoryLimit(cat.id, newLimit);
+                Navigator.pop(context);
+              },
+              child: const Text('Save Limit'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.sizeOf(context).width < 800;
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 1024;
+
     final budgetAsync = ref.watch(budgetStateProvider);
     final usersAsync = ref.watch(usersProvider);
-    final currentUser = ref.watch(currentUserProvider); 
+    final currentUser = ref.watch(currentUserProvider);
 
     if (budgetAsync.isLoading || usersAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+      return const Center(child: CircularProgressIndicator(color: AppTheme.moss));
     }
 
     final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
     final users = usersAsync.value ?? [];
-    final debtMessage = calculateDebt(budgetState.expenses, users);
 
-    if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
+    if (_selectedAssignee == null && currentUser != null) {
       _selectedAssignee = currentUser.name;
     } else if (_selectedAssignee == null && users.isNotEmpty) {
       _selectedAssignee = users.first.name;
     }
 
-    Widget categoriesList = ListView.separated(
-      shrinkWrap: isMobile,
-      physics: isMobile ? const NeverScrollableScrollPhysics() : const AlwaysScrollableScrollPhysics(),
-      itemCount: budgetState.categories.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 24),
-      itemBuilder: (context, index) {
-        final cat = budgetState.categories[index];
-        final progress = cat.limit > 0 ? (cat.currentSpent / cat.limit).clamp(0.0, 1.0) : 0.0;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(cat.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                Text('${cat.currentSpent.toStringAsFixed(0)} / ${cat.limit.toStringAsFixed(0)} USD', style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(value: progress, backgroundColor: AppTheme.textLight.withValues(alpha: 0.1), valueColor: const AlwaysStoppedAnimation(AppTheme.mossGreen), minHeight: 4),
-          ],
-        );
-      },
-    );
+    if (_selectedCategory == null && budgetState.categories.isNotEmpty) {
+      _selectedCategory = budgetState.categories.first.name;
+    }
 
-    Widget leftPanel = Column(
+    // Settlement calculations
+    final debtSummary = calculateDebt(budgetState.expenses, users);
+    final isBalanced = debtSummary.contains('balanced');
+
+    // Resident Outflows & Incomes
+    final flows = users.map((u) {
+      final userExpenses = budgetState.expenses.where((e) => e.assignee == u.name);
+      final userIncomes = budgetState.incomes.where((i) => i.assignee == u.name);
+      final outTotal = userExpenses.fold(0.0, (s, e) => s + e.amount);
+      final inTotal = userIncomes.fold(0.0, (s, i) => s + i.amount);
+      return (user: u, out: outTotal, income: inTotal);
+    }).toList();
+
+    // Transactions list combining expenses and incomes
+    final allTransactions = [
+      ...budgetState.expenses.map((e) => (id: e.id, title: e.title, amount: e.amount, date: e.date, type: 'Expense', assignee: e.assignee, category: e.category)),
+      ...budgetState.incomes.map((i) => (id: i.id, title: i.title, amount: i.amount, date: i.date, type: 'Income', assignee: i.assignee, category: 'Income')),
+    ];
+    allTransactions.sort((a, b) => b.date.compareTo(a.date));
+
+    final leftPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Resident flow cards
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final useTwoCols = constraints.maxWidth >= 450;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: useTwoCols ? 2 : 1,
+                mainAxisExtent: 88,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: flows.length,
+              itemBuilder: (context, index) {
+                final flow = flows[index];
+                return Container(
+                  decoration: AppTheme.cardDecoration,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      HearthAvatar(name: flow.user.name, color: flow.user.color, size: 44),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              flow.user.name,
+                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 12,
+                              children: [
+                                Text(
+                                  'In: \$${flow.income.round()}',
+                                  style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.moss),
+                                ),
+                                Text(
+                                  'Out: \$${flow.out.round()}',
+                                  style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        ),
+        const SizedBox(height: 24),
+
+        // Categories section
         Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: AppTheme.sage.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.sage)),
+          decoration: AppTheme.cardDecoration,
+          padding: const EdgeInsets.all(28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('SETTLEMENT BALANCE', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2)),
+              const SectionHeader(sub: 'This month', title: 'Categories'),
               const SizedBox(height: 8),
-              Text(debtMessage, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppTheme.textDark)),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: budgetState.categories.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 20),
+                itemBuilder: (context, index) {
+                  final cat = budgetState.categories[index];
+                  final ratio = cat.limit > 0 ? (cat.currentSpent / cat.limit) : 0.0;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cat.name,
+                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                            ),
+                          ),
+                          Text(
+                            '${cat.currentSpent.round()} / ${cat.limit.round()} USD',
+                            style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 14, color: AppTheme.muted),
+                            splashRadius: 14,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                            onPressed: () => _showEditLimitDialog(context, cat),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      HearthProgressBar(value: ratio),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: users.map((user) {
-              final income = budgetState.incomes.where((i) => i.assignee == user.name).fold(0.0, (s, i) => s + i.amount);
-              final expense = budgetState.expenses.where((e) => e.assignee == user.name).fold(0.0, (s, e) => s + e.amount);
-              return Container(
-                width: 200,
-                margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: user.color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(user.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: user.color)),
-                    const SizedBox(height: 8),
-                    Text('In: \$${income.toStringAsFixed(0)}', style: GoogleFonts.dmMono(fontSize: 14)),
-                    Text('Out: \$${expense.toStringAsFixed(0)}', style: GoogleFonts.dmMono(fontSize: 14)),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 48),
-        Text('Categories', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24)),
-        const SizedBox(height: 24),
-        isMobile ? categoriesList : Expanded(child: categoriesList),
       ],
     );
 
-    Widget rightPanel = Column(
+    final rightPanel = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
+        // Transaction Form
+        FormCard(
+          sub: 'New entry',
+          title: 'Log a transaction',
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Log a transaction', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20)),
-              const SizedBox(height: 24),
-              SegmentedButton<String>(
-                segments: const [ButtonSegment(value: 'Expense', label: Text('Expense')), ButtonSegment(value: 'Income', label: Text('Income'))],
-                selected: {_transactionType},
-                onSelectionChanged: (val) => setState(() { _transactionType = val.first; if (_transactionType == 'Income') _selectedCategory = null; }),
+              HearthSegmented<String>(
+                value: _selectedType,
+                options: const ['Expense', 'Income'],
+                onChanged: (val) => setState(() => _selectedType = val),
+                labelBuilder: (s) => s,
               ),
               const SizedBox(height: 16),
-              TextField(controller: _titleController, decoration: InputDecoration(hintText: 'Description', enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2))))),
+              Text('Description', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _descCtrl,
+                decoration: const InputDecoration(hintText: 'e.g. Biedronka weekly shop'),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      decoration: BoxDecoration(color: AppTheme.cardBackground, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          isExpanded: true,
-                          value: _selectedAssignee,
-                          items: users.map((u) => DropdownMenuItem(value: u.name, child: Text(u.name))).toList(),
-                          onChanged: (val) => setState(() => _selectedAssignee = val),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Paid by', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                        const SizedBox(height: 6),
+                        HearthSelect<String>(
+                          value: _selectedAssignee ?? '',
+                          items: users.map((u) => u.name).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedAssignee = val);
+                          },
+                          labelBuilder: (name) => name,
                         ),
-                      ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextField(controller: _amountController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(hintText: '0.00', enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2))))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Amount (USD)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _amountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: GoogleFonts.dmMono(fontSize: 14),
+                          decoration: const InputDecoration(hintText: '0.00'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              if (_transactionType == 'Expense') ...[
+              if (_selectedType == 'Expense') ...[
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.cardBackground, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String?>(
-                      isExpanded: true,
-                      value: _selectedCategory,
-                      hint: const Text('Category'),
-                      items: budgetState.categories.map((c) => DropdownMenuItem(value: c.name, child: Text(c.name))).toList(),
-                      onChanged: (val) => setState(() => _selectedCategory = val),
-                    ),
-                  ),
+                Text('Category', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                const SizedBox(height: 6),
+                HearthSelect<String>(
+                  value: _selectedCategory ?? '',
+                  items: budgetState.categories.map((c) => c.name).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedCategory = val);
+                  },
+                  labelBuilder: (name) => name,
                 ),
               ],
-              const SizedBox(height: 24),
-              ElevatedButton(onPressed: _submitTransaction, child: const Text('Add transaction')),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton(
+                  onPressed: () => _submitTransaction(budgetState.categories, users),
+                  child: Text('Log ${_selectedType.toLowerCase()}'),
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 48),
-        Text('RECENT EXPENSES', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textLight)),
-        const SizedBox(height: 16),
-        isMobile
-          ? ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: budgetState.expenses.length,
-              itemBuilder: (context, index) {
-                final exp = budgetState.expenses[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(exp.title, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  subtitle: Text('${exp.assignee} · ${exp.category}'),
-                  trailing: Text('${exp.amount.toStringAsFixed(0)} USD', style: GoogleFonts.dmMono(fontSize: 16)),
-                );
-              },
-            )
-          : Expanded(
-              child: ListView.builder(
-                itemCount: budgetState.expenses.length,
-                itemBuilder: (context, index) {
-                  final exp = budgetState.expenses[index];
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(exp.title, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    subtitle: Text('${exp.assignee} · ${exp.category}'),
-                    trailing: Text('${exp.amount.toStringAsFixed(0)} USD', style: GoogleFonts.dmMono(fontSize: 16)),
-                  );
-                },
+        const SizedBox(height: 24),
+
+        // Recent Transactions Section
+        Container(
+          decoration: AppTheme.cardDecoration,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: SectionHeader(sub: 'Swipe left to delete', title: 'Recent'),
               ),
-            ),
+              if (allTransactions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text('No transactions logged.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: allTransactions.length,
+                  separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                  itemBuilder: (context, index) {
+                    final tx = allTransactions[index];
+                    final isInc = tx.type == 'Income';
+                    final sign = isInc ? '+' : '−';
+
+                    return Dismissible(
+                      key: Key(tx.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: AppTheme.danger,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                            SizedBox(width: 6),
+                            Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                      onDismissed: (_) {
+                        FirebaseFirestore.instance.collection('budget_transactions').doc(tx.id).delete();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Deleted "${tx.title}"'),
+                            backgroundColor: AppTheme.ink,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tx.title,
+                                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${tx.assignee} · ${tx.category}',
+                                    style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '$sign\$${tx.amount.round()} USD',
+                              style: GoogleFonts.dmMono(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: isInc ? AppTheme.moss : AppTheme.ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
       ],
     );
 
-    return isMobile 
-      ? SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [leftPanel, const SizedBox(height: 48), rightPanel]))
-      : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(flex: 6, child: leftPanel), const SizedBox(width: 48), Expanded(flex: 4, child: rightPanel)]);
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Settlement Balance Banner
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: AppTheme.sage.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'SETTLEMENT BALANCE',
+                        style: AppTheme.microStyle.copyWith(color: AppTheme.moss.withValues(alpha: 0.8)),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        debtSummary,
+                        style: AppTheme.titleStyle(fontSize: isDesktop ? 28 : 22, color: AppTheme.moss),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: isBalanced
+                      ? null
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Settlement settled!'),
+                              backgroundColor: AppTheme.moss,
+                            ),
+                          );
+                        },
+                  child: const Text('Settle Up'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Multi-column or single column
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: leftPanel),
+                const SizedBox(width: 32),
+                Expanded(flex: 5, child: rightPanel),
+              ],
+            ),
+          ] else ...[
+            leftPanel,
+            const SizedBox(height: 32),
+            rightPanel,
+          ],
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
   }
 }

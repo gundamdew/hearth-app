@@ -1,12 +1,11 @@
+// lib/screens/cleaning_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
-import '../models/chore.dart';
-import '../models/user_model.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
-import '../providers/auth_provider.dart';
+import '../widgets/hearth_ui.dart';
 
 class CleaningScreen extends ConsumerStatefulWidget {
   const CleaningScreen({super.key});
@@ -16,290 +15,416 @@ class CleaningScreen extends ConsumerStatefulWidget {
 }
 
 class _CleaningScreenState extends ConsumerState<CleaningScreen> {
-  final TextEditingController _taskController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
+  final TextEditingController _taskNameCtrl = TextEditingController();
+  final TextEditingController _roomCtrl = TextEditingController(text: 'Kitchen');
   String? _selectedAssignee;
 
   @override
   void dispose() {
-    _taskController.dispose();
-    _categoryController.dispose();
+    _taskNameCtrl.dispose();
+    _roomCtrl.dispose();
     super.dispose();
-  }
-
-  void _submitChore() {
-    final name = _taskController.text.trim();
-    final category = _categoryController.text.trim();
-    
-    if (name.isNotEmpty && _selectedAssignee != null) {
-      ref.read(cleaningControllerProvider).addChore(name, category.isEmpty ? 'General' : category, _selectedAssignee!);
-      _taskController.clear();
-      _categoryController.clear();
-      FocusScope.of(context).unfocus();
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.sizeOf(context).width < 800;
+    final width = MediaQuery.sizeOf(context).width;
+    final isDesktop = width >= 1024;
+
     final choresAsync = ref.watch(cleaningProvider);
     final usersAsync = ref.watch(usersProvider);
-    final currentUser = ref.watch(currentUserProvider); 
 
     if (choresAsync.isLoading || usersAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
+      return const Center(child: CircularProgressIndicator(color: AppTheme.moss));
     }
 
     final chores = choresAsync.value ?? [];
     final users = usersAsync.value ?? [];
     final userNames = users.map((u) => u.name).toList();
 
-    if (_selectedAssignee == null && currentUser != null && users.any((u) => u.name == currentUser.name)) {
-      _selectedAssignee = currentUser.name;
+    if (_selectedAssignee == null && users.isNotEmpty) {
+      _selectedAssignee = users.first.name;
     }
 
-    Widget topCards = SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: users.map((user) {
-          final userTasks = chores.where((c) => c.assignee == user.name).toList();
-          final completed = userTasks.where((c) => c.isDone).length;
-          return Container(
-            width: 250,
-            margin: const EdgeInsets.only(right: 16.0),
-            child: _buildUserCard(user.name, completed, userTasks.length, user.color),
-          );
-        }).toList(),
-      ),
+    final topResidentCards = LayoutBuilder(
+      builder: (context, constraints) {
+        final useTwoCols = constraints.maxWidth >= 450;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: useTwoCols ? 2 : 1,
+            mainAxisExtent: 88,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            final userChores = chores.where((c) => c.assignee == user.name).toList();
+            final doneCount = userChores.where((c) => c.isDone).length;
+            final ratio = userChores.isNotEmpty ? (doneCount / userChores.length) : 0.0;
+
+            return Container(
+              decoration: AppTheme.cardDecoration,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  HearthAvatar(name: user.name, color: user.color, size: 44),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user.name,
+                                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              '$doneCount/${userChores.length}',
+                              style: GoogleFonts.dmMono(fontSize: 13, color: AppTheme.muted),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        HearthProgressBar(
+                          value: ratio,
+                          color: user.color,
+                          dangerThreshold: 2.0,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final actionButtons = Wrap(
+      spacing: 12,
+      runSpacing: 12,
       children: [
-        isMobile 
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                topCards,
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames), child: const Text('Balance load')),
-                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames), child: const Text('Swap & new week')),
-                  ],
-                ),
-              ],
-            )
-          : Row(
-              children: [
-                Expanded(child: topCards),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames), child: const Text('Balance load')),
-                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames), child: const Text('Swap & new week')),
-                  ],
-                )
-              ],
-            ),
-        const SizedBox(height: 32),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppTheme.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
-            ),
-            child: Column(
-              children: [
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: chores.length,
-                    separatorBuilder: (context, index) => Divider(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                    itemBuilder: (context, index) => _buildChoreRow(context, chores[index], userNames, users),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildAddTaskForm(userNames, isMobile),
-              ],
-            ),
-          ),
+        OutlinedButton.icon(
+          onPressed: () {
+            ref.read(cleaningControllerProvider).balanceLoad(chores, userNames);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Chores evenly redistributed'), backgroundColor: AppTheme.moss),
+            );
+          },
+          icon: const Icon(Icons.balance, size: 16),
+          label: const Text('Balance load'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () {
+            ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('New week started — assignments rotated'), backgroundColor: AppTheme.moss),
+            );
+          },
+          icon: const Icon(Icons.sync, size: 16),
+          label: const Text('Swap & new week'),
         ),
       ],
     );
-  }
 
-  Widget _buildUserCard(String name, int completed, int total, Color color) {
-    final progress = total == 0 ? 0.0 : completed / total;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
-      child: Row(
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(backgroundColor: color.withValues(alpha: 0.2), child: Text(name.isNotEmpty ? name[0] : '?', style: TextStyle(color: color, fontWeight: FontWeight.bold))),
-          const SizedBox(width: 16),
-          Expanded(
+          // Top Workload Header
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: topResidentCards),
+                const SizedBox(width: 24),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: actionButtons,
+                ),
+              ],
+            ),
+          ] else ...[
+            topResidentCards,
+            const SizedBox(height: 16),
+            actionButtons,
+          ],
+          const SizedBox(height: 32),
+
+          // Main Chores Card
+          Container(
+            decoration: AppTheme.cardDecoration,
+            clipBehavior: Clip.antiAlias,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-                    Text('$completed/$total', style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.textLight)),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                LinearProgressIndicator(value: progress, backgroundColor: AppTheme.textLight.withValues(alpha: 0.1), valueColor: AlwaysStoppedAnimation<Color>(color), minHeight: 4, borderRadius: BorderRadius.circular(2)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChoreRow(BuildContext context, Chore chore, List<String> availableUsers, List<AppUser> users) {
-    final userColor = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '', pinCode: '', color: AppTheme.textLight)).color;
-
-    return Dismissible(
-      key: Key(chore.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: AppTheme.red.withValues(alpha: 0.1),
-        child: const Icon(Icons.delete_outline, color: AppTheme.red),
-      ),
-      onDismissed: (direction) {
-        ref.read(cleaningControllerProvider).deleteChore(chore.id);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12.0),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(chore.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, decoration: chore.isDone ? TextDecoration.lineThrough : null, color: chore.isDone ? AppTheme.textLight : AppTheme.textDark)),
-                  const SizedBox(height: 4),
-                  Text(chore.category, style: const TextStyle(fontSize: 12, color: AppTheme.textLight)),
-                ],
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () => ref.read(cleaningControllerProvider).changeAssignee(chore.id, chore.assignee, availableUsers),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: userColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
-                    child: Text(chore.assignee, style: TextStyle(color: userColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                ),
-              ),
-            ),
-            Checkbox(value: chore.isDone, activeColor: AppTheme.mossGreen, onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone)),
-            const SizedBox(width: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddTaskForm(List<String> userNames, bool isMobile) {
-    String? validAssignee = userNames.contains(_selectedAssignee) 
-        ? _selectedAssignee 
-        : (userNames.isNotEmpty ? userNames.first : null);
-
-    if (isMobile) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: AppTheme.textLight.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Add a task', style: TextStyle(fontWeight: FontWeight.w500)),
-            const SizedBox(height: 16),
-            _buildTextField(_taskController, 'e.g. Mop kitchen floor'),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(child: _buildTextField(_categoryController, 'Kitchen')),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: validAssignee,
-                        items: userNames.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                        onChanged: (val) => setState(() => _selectedAssignee = val),
-                      ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: SectionHeader(
+                    sub: 'This week',
+                    title: 'Chores',
+                    action: Text(
+                      'Tap a name to reassign',
+                      style: TextStyle(fontSize: 12, color: AppTheme.muted),
                     ),
                   ),
                 ),
+                if (chores.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Text('No chores added.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: chores.length,
+                    separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                    itemBuilder: (context, index) {
+                      final chore = chores[index];
+                      final userMatches = users.where((u) => u.name == chore.assignee);
+                      final assignedUser = userMatches.isNotEmpty ? userMatches.first : null;
+
+                      return Dismissible(
+                        key: Key(chore.id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: AppTheme.danger,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Icon(Icons.delete_outline, color: Colors.white, size: 18),
+                              SizedBox(width: 6),
+                              Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                        onDismissed: (_) {
+                          ref.read(cleaningControllerProvider).deleteChore(chore.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Deleted "${chore.name}"'),
+                              backgroundColor: AppTheme.ink,
+                              action: SnackBarAction(
+                                label: 'UNDO',
+                                textColor: AppTheme.sage,
+                                onPressed: () {
+                                  ref.read(cleaningControllerProvider).addChore(
+                                    chore.name,
+                                    chore.category,
+                                    chore.assignee,
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                          child: Row(
+                            children: [
+                              HearthCheckbox(
+                                checked: chore.isDone,
+                                onChange: () {
+                                  ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
+                                },
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      chore.name,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w500,
+                                        color: chore.isDone ? AppTheme.muted : AppTheme.ink,
+                                        decoration: chore.isDone ? TextDecoration.lineThrough : null,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      chore.category,
+                                      style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ResidentBadge(
+                                name: chore.assignee,
+                                color: assignedUser?.color,
+                                onTap: () {
+                                  ref.read(cleaningControllerProvider).changeAssignee(
+                                    chore.id,
+                                    chore.assignee,
+                                    userNames,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                // Add Task Bar at bottom of card
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: Color.fromRGBO(247, 245, 240, 0.6),
+                    border: Border(top: BorderSide(color: AppTheme.line)),
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final useHorizontal = constraints.maxWidth >= 600;
+
+                      final taskInput = TextField(
+                        controller: _taskNameCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Descale the kettle',
+                          fillColor: Colors.white,
+                        ),
+                      );
+
+                      final roomInput = TextField(
+                        controller: _roomCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'Kitchen',
+                          fillColor: Colors.white,
+                        ),
+                      );
+
+                      final assigneeSelect = HearthSelect<String>(
+                        value: _selectedAssignee ?? '',
+                        items: userNames,
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedAssignee = val);
+                        },
+                        labelBuilder: (name) => name,
+                      );
+
+                      final addBtn = ElevatedButton.icon(
+                        onPressed: () {
+                          final name = _taskNameCtrl.text.trim();
+                          final room = _roomCtrl.text.trim().isEmpty ? 'General' : _roomCtrl.text.trim();
+                          final assignee = _selectedAssignee ?? (userNames.isNotEmpty ? userNames.first : '');
+
+                          if (name.isNotEmpty && assignee.isNotEmpty) {
+                            ref.read(cleaningControllerProvider).addChore(name, room, assignee);
+                            _taskNameCtrl.clear();
+                            FocusScope.of(context).unfocus();
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Add task'),
+                      );
+
+                      if (useHorizontal) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Task name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  const SizedBox(height: 6),
+                                  taskInput,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Room', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  const SizedBox(height: 6),
+                                  roomInput,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Assignee', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  const SizedBox(height: 6),
+                                  assigneeSelect,
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            addBtn,
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('Task name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                          const SizedBox(height: 6),
+                          taskInput,
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Room', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                    const SizedBox(height: 6),
+                                    roomInput,
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Assignee', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                    const SizedBox(height: 6),
+                                    assigneeSelect,
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          addBtn,
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: _submitChore, child: const Text('Add task'))
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppTheme.textLight.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          const Text('Add a task', style: TextStyle(fontWeight: FontWeight.w500)),
-          const SizedBox(width: 24),
-          Expanded(flex: 2, child: _buildTextField(_taskController, 'e.g. Mop kitchen floor')),
-          const SizedBox(width: 12),
-          Expanded(flex: 1, child: _buildTextField(_categoryController, 'Kitchen')),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: validAssignee,
-                  items: userNames.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                  onChanged: (val) => setState(() => _selectedAssignee = val),
-                ),
-              ),
-            ),
           ),
-          const SizedBox(width: 12),
-          ElevatedButton(onPressed: _submitChore, style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18)), child: const Text('Add task'))
+          const SizedBox(height: 48),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller, String hint) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppTheme.textLight, fontSize: 14),
-        fillColor: Colors.white,
-        filled: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
-        focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: AppTheme.mossGreen), borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
