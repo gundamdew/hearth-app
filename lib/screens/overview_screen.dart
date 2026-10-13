@@ -17,6 +17,8 @@ class OverviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isMobile = MediaQuery.sizeOf(context).width < 800;
+
     final budgetAsync = ref.watch(budgetStateProvider);
     final inventoryAsync = ref.watch(inventoryProvider);
     final mealPlanAsync = ref.watch(mealPlanProvider);
@@ -50,7 +52,6 @@ class OverviewScreen extends ConsumerWidget {
 
     final runningLowItems = inventory.where((item) => item.isRunningLow).toList();
 
-    // Извлечение расписания конкретно на сегодняшний день
     final todayId = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final todaysPlan = mealPlan.firstWhere(
       (plan) => plan.id == todayId,
@@ -72,236 +73,138 @@ class OverviewScreen extends ConsumerWidget {
         : users.map((u) => u.name.toUpperCase()).join(' & ');
     final dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now()).toUpperCase();
 
+    Widget budgetCard = _buildMetricCard(
+      context, 
+      'LEFT TO SPEND THIS MONTH', 
+      '${remainingBudget.toStringAsFixed(0)} USD', 
+      LinearProgressIndicator(
+        value: budgetProgress,
+        backgroundColor: AppTheme.textLight.withValues(alpha: 0.1),
+        valueColor: AlwaysStoppedAnimation(budgetProgress > 0.9 ? AppTheme.red : AppTheme.mossGreen),
+        minHeight: 4,
+        borderRadius: BorderRadius.circular(2),
+      )
+    );
+
+    Widget dinnerCard = _buildMetricCard(
+      context, 
+      'TONIGHT\'S DINNER', 
+      todaysRecipe?.name ?? 'Nothing planned yet', 
+      Text('$plannedDinnersCount of 14 dinners planned', style: const TextStyle(color: AppTheme.textLight, fontSize: 14)),
+      isItalic: todaysRecipe == null
+    );
+
+    Widget lowStockCard = _buildListCard(
+      context, 
+      'RUNNING LOW', 
+      '${runningLowItems.length} items', 
+      runningLowItems.isEmpty 
+        ? const Text('Everything is stocked up!', style: TextStyle(color: AppTheme.textLight))
+        : Column(
+            children: runningLowItems.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  Text('${item.quantity} ${item.unit}', style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight)),
+                ],
+              ),
+            )).toList(),
+          )
+    );
+
+    Widget choresCard = _buildListCard(
+      context, 
+      'TODAY\'S CHORES', 
+      '', 
+      Column(
+        children: chores.map((chore) {
+          final user = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '?', pinCode: '', color: AppTheme.textLight));
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: chore.isDone,
+                  activeColor: AppTheme.mossGreen,
+                  onChanged: (_) => ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone),
+                ),
+                Expanded(
+                  child: Text(
+                    chore.name,
+                    style: TextStyle(fontSize: 16, decoration: chore.isDone ? TextDecoration.lineThrough : null, color: chore.isDone ? AppTheme.textLight : AppTheme.textDark),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: user.color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                  child: Text(chore.assignee, style: TextStyle(color: user.color, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      )
+    );
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$headerNames · $dateStr',
-            style: GoogleFonts.instrumentSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-              color: AppTheme.textLight,
-            ),
-          ),
+          Text('$headerNames · $dateStr', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
           const SizedBox(height: 32),
+          
+          isMobile
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [budgetCard, const SizedBox(height: 16), dinnerCard])
+            : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: budgetCard), const SizedBox(width: 24), Expanded(child: dinnerCard)]),
+            
+          const SizedBox(height: 24),
+          
+          isMobile
+            ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [lowStockCard, const SizedBox(height: 16), choresCard])
+            : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: lowStockCard), const SizedBox(width: 24), Expanded(child: choresCard)]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCard(BuildContext context, String title, String value, Widget bottomWidget, {bool isItalic = false}) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
+          const SizedBox(height: 16),
+          Text(value, style: isItalic 
+            ? Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 28, fontStyle: FontStyle.italic, color: AppTheme.textLight)
+            : GoogleFonts.dmMono(fontSize: 40, fontWeight: FontWeight.w500, color: AppTheme.textDark)),
+          const SizedBox(height: 24),
+          bottomWidget,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListCard(BuildContext context, String title, String subtitle, Widget content) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'LEFT TO SPEND THIS MONTH',
-                        style: GoogleFonts.instrumentSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: AppTheme.textLight,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '${remainingBudget.toStringAsFixed(0)} USD',
-                        style: GoogleFonts.dmMono(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      LinearProgressIndicator(
-                        value: budgetProgress,
-                        backgroundColor: AppTheme.textLight.withValues(alpha: 0.1),
-                        valueColor: AlwaysStoppedAnimation(
-                          budgetProgress > 0.9 ? AppTheme.red : AppTheme.mossGreen,
-                        ),
-                        minHeight: 4,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TONIGHT\'S DINNER',
-                        style: GoogleFonts.instrumentSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: AppTheme.textLight,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        todaysRecipe?.name ?? 'Nothing planned yet',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontSize: 28,
-                          fontStyle: todaysRecipe == null ? FontStyle.italic : FontStyle.normal,
-                          color: todaysRecipe == null ? AppTheme.textLight : AppTheme.textDark,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        '$plannedDinnersCount of 14 dinners planned',
-                        style: const TextStyle(color: AppTheme.textLight, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              Text(title, style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 1.2, color: AppTheme.textLight)),
+              if (subtitle.isNotEmpty) Text(subtitle, style: const TextStyle(color: AppTheme.textLight, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'RUNNING LOW',
-                            style: GoogleFonts.instrumentSans(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                              color: AppTheme.textLight,
-                            ),
-                          ),
-                          Text(
-                            '${runningLowItems.length} items',
-                            style: const TextStyle(color: AppTheme.textLight, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      if (runningLowItems.isEmpty)
-                        const Text('Everything is stocked up!', style: TextStyle(color: AppTheme.textLight)),
-                      ...runningLowItems.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(item.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                            Text(
-                              '${item.quantity} ${item.unit}',
-                              style: GoogleFonts.dmMono(fontSize: 14, color: AppTheme.textLight),
-                            ),
-                          ],
-                        ),
-                      )),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardBackground,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.1)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'TODAY\'S CHORES',
-                        style: GoogleFonts.instrumentSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: AppTheme.textLight,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      ...chores.map((chore) {
-                        final user = users.firstWhere((u) => u.name == chore.assignee, orElse: () => AppUser(id: '', name: '?', pinCode: '', color: AppTheme.textLight));
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Row(
-                            children: [
-                              Checkbox(
-                                value: chore.isDone,
-                                activeColor: AppTheme.mossGreen,
-                                onChanged: (_) {
-                                  ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
-                                },
-                              ),
-                              Expanded(
-                                child: Text(
-                                  chore.name,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    decoration: chore.isDone ? TextDecoration.lineThrough : null,
-                                    color: chore.isDone ? AppTheme.textLight : AppTheme.textDark,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: user.color.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  chore.assignee,
-                                  style: TextStyle(
-                                    color: user.color,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+          content,
         ],
       ),
     );

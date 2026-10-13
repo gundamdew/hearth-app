@@ -60,7 +60,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(usersProvider);
 
-    if (usersAsync is AsyncLoading) {
+    if (usersAsync.isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.mossGreen));
     }
 
@@ -69,8 +69,11 @@ class SettingsScreen extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap( // Wrap вместо Row позволяет элементам переноситься на смартфонах
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16,
+          runSpacing: 16,
           children: [
             Text('Household Settings', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 24)),
             ElevatedButton.icon(

@@ -80,54 +80,65 @@ class MainScaffold extends ConsumerWidget {
     }
 
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Hearth.',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 48),
-                ),
-                Row(
-                  children: [
-                    _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
-                    _NavItem(title: 'Overview', path: '/', currentPath: currentPath),
-                    _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
-                    _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),
-                    _NavItem(title: 'Meals', path: '/meals', currentPath: currentPath),
-                    _NavItem(title: 'Cleaning', path: '/cleaning', currentPath: currentPath),
-                    const SizedBox(width: 48),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2))),
-                      child: Row(
-                        children: [
-                          CircleAvatar(radius: 12, backgroundColor: currentUser.color.withValues(alpha: 0.2), child: Text(currentUser.name[0], style: TextStyle(color: currentUser.color, fontSize: 10, fontWeight: FontWeight.bold))),
-                          const SizedBox(width: 8),
-                          Text(currentUser.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: () => ref.read(currentUserProvider.notifier).logout(), // ИЗМЕНЕНО
-                            child: const Icon(Icons.logout, size: 16, color: AppTheme.textLight),
-                          )
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              ],
+      // SafeArea защищает контент от наложения на "челку" смартфона и системный бар
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              // Уменьшаем отступы для мобильных экранов
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  Text(
+                    'Hearth.',
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontSize: 36),
+                  ),
+                  // Оборачиваем навигацию в скролл, чтобы она не ломала верстку на смартфонах
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _NavItem(title: 'Settings', path: '/settings', currentPath: currentPath),
+                        _NavItem(title: 'Overview', path: '/', currentPath: currentPath),
+                        _NavItem(title: 'Budget', path: '/budget', currentPath: currentPath),
+                        _NavItem(title: 'Inventory', path: '/inventory', currentPath: currentPath),
+                        _NavItem(title: 'Meals', path: '/meals', currentPath: currentPath),
+                        _NavItem(title: 'Cleaning', path: '/cleaning', currentPath: currentPath),
+                        const SizedBox(width: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: AppTheme.cardBackground, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2))),
+                          child: Row(
+                            children: [
+                              CircleAvatar(radius: 12, backgroundColor: currentUser.color.withValues(alpha: 0.2), child: Text(currentUser.name[0], style: TextStyle(color: currentUser.color, fontSize: 10, fontWeight: FontWeight.bold))),
+                              const SizedBox(width: 8),
+                              Text(currentUser.name, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
+                              const SizedBox(width: 12),
+                              GestureDetector(
+                                onTap: () => ref.read(currentUserProvider.notifier).logout(),
+                                child: const Icon(Icons.logout, size: 16, color: AppTheme.textLight),
+                              )
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48.0),
-              child: child,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: child,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -144,7 +155,8 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isActive = currentPath == path;
     return Padding(
-      padding: const EdgeInsets.only(left: 32.0),
+      // Уменьшен внутренний отступ кнопок навигации
+      padding: const EdgeInsets.only(right: 12.0),
       child: GestureDetector(
         onTap: () => context.go(path),
         child: Container(

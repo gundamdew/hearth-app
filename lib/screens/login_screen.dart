@@ -164,9 +164,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildPinButton(String label, {bool isAction = false}) {
     return GestureDetector(
       onTap: () {
-        if (label == 'Cancel') setState(() => _selectedUser = null);
-        else if (label == 'Del') setState(() => _enteredPin = _enteredPin.isNotEmpty ? _enteredPin.substring(0, _enteredPin.length - 1) : '');
-        else _handleKeyPress(label);
+        if (label == 'Cancel') {
+          setState(() => _selectedUser = null);
+        } else if (label == 'Del') {
+          setState(() => _enteredPin = _enteredPin.isNotEmpty ? _enteredPin.substring(0, _enteredPin.length - 1) : '');
+        } else {
+          _handleKeyPress(label);
+        }
       },
       child: Container(
         width: 70,

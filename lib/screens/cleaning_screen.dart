@@ -41,6 +41,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 800;
     final choresAsync = ref.watch(cleaningProvider);
     final usersAsync = ref.watch(usersProvider);
     final currentUser = ref.watch(currentUserProvider); 
@@ -57,38 +58,52 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
       _selectedAssignee = currentUser.name;
     }
 
+    Widget topCards = SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: users.map((user) {
+          final userTasks = chores.where((c) => c.assignee == user.name).toList();
+          final completed = userTasks.where((c) => c.isDone).length;
+          return Container(
+            width: 250,
+            margin: const EdgeInsets.only(right: 16.0),
+            child: _buildUserCard(user.name, completed, userTasks.length, user.color),
+          );
+        }).toList(),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            ...users.map((user) {
-              final userTasks = chores.where((c) => c.assignee == user.name).toList();
-              final completed = userTasks.where((c) => c.isDone).length;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 24.0),
-                  child: _buildUserCard(user.name, completed, userTasks.length, user.color),
-                ),
-              );
-            }),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+        isMobile 
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextButton(
-                  onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames),
-                  child: const Text('Balance load'),
-                ),
-                TextButton(
-                  onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames),
-                  child: const Text('Swap & new week'),
+                topCards,
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames), child: const Text('Balance load')),
+                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames), child: const Text('Swap & new week')),
+                  ],
                 ),
               ],
             )
-          ],
-        ),
+          : Row(
+              children: [
+                Expanded(child: topCards),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).balanceLoad(chores, userNames), child: const Text('Balance load')),
+                    TextButton(onPressed: () => ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames), child: const Text('Swap & new week')),
+                  ],
+                )
+              ],
+            ),
         const SizedBox(height: 32),
-
         Expanded(
           child: Container(
             padding: const EdgeInsets.all(32),
@@ -107,7 +122,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildAddTaskForm(userNames),
+                _buildAddTaskForm(userNames, isMobile),
               ],
             ),
           ),
@@ -160,19 +175,6 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
       ),
       onDismissed: (direction) {
         ref.read(cleaningControllerProvider).deleteChore(chore.id);
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${chore.name} deleted'),
-            action: SnackBarAction(
-              label: 'UNDO',
-              textColor: AppTheme.amber,
-              onPressed: () {
-                ref.read(cleaningControllerProvider).addChore(chore.name, chore.category, chore.assignee);
-              },
-            ),
-          ),
-        );
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0),
@@ -211,10 +213,48 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     );
   }
 
-  Widget _buildAddTaskForm(List<String> userNames) {
+  Widget _buildAddTaskForm(List<String> userNames, bool isMobile) {
     String? validAssignee = userNames.contains(_selectedAssignee) 
         ? _selectedAssignee 
         : (userNames.isNotEmpty ? userNames.first : null);
+
+    if (isMobile) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppTheme.textLight.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Add a task', style: TextStyle(fontWeight: FontWeight.w500)),
+            const SizedBox(height: 16),
+            _buildTextField(_taskController, 'e.g. Mop kitchen floor'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _buildTextField(_categoryController, 'Kitchen')),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white, border: Border.all(color: AppTheme.textLight.withValues(alpha: 0.2)), borderRadius: BorderRadius.circular(8)),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: validAssignee,
+                        items: userNames.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                        onChanged: (val) => setState(() => _selectedAssignee = val),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: _submitChore, child: const Text('Add task'))
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
