@@ -75,15 +75,15 @@ class MainScaffold extends ConsumerWidget {
   String _getPageTitle(String path) {
     switch (path) {
       case '/budget':
-        return 'Budget';
+        return 'Budżet';
       case '/inventory':
-        return 'Inventory';
+        return 'Spiżarnia';
       case '/meals':
-        return 'Meals';
+        return 'Posiłki';
       case '/cleaning':
-        return 'Cleaning';
+        return 'Sprzątanie';
       case '/settings':
-        return 'Settings';
+        return 'Ustawienia';
       default:
         return '';
     }
@@ -103,11 +103,11 @@ class MainScaffold extends ConsumerWidget {
     final pageTitle = _getPageTitle(currentPath);
 
     final navItems = const [
-      (id: 'Overview', path: '/', icon: Icons.home_outlined, activeIcon: Icons.home),
-      (id: 'Budget', path: '/budget', icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet),
-      (id: 'Inventory', path: '/inventory', icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2),
-      (id: 'Meals', path: '/meals', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen),
-      (id: 'Cleaning', path: '/cleaning', icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome),
+      (id: 'Przegląd', path: '/', icon: Icons.home_outlined, activeIcon: Icons.home),
+      (id: 'Budżet', path: '/budget', icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet),
+      (id: 'Spiżarnia', path: '/inventory', icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2),
+      (id: 'Posiłki', path: '/meals', icon: Icons.soup_kitchen_outlined, activeIcon: Icons.soup_kitchen),
+      (id: 'Sprzątanie', path: '/cleaning', icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome),
     ];
 
     final horizontalPadding = isDesktop ? 48.0 : (isMobile ? 16.0 : 24.0);
@@ -217,6 +217,7 @@ class MainScaffold extends ConsumerWidget {
                                       HearthAvatar(
                                         name: currentUser.name,
                                         color: currentUser.color,
+                                        avatar: currentUser.avatar,
                                         size: 30,
                                       ),
                                       if (!isMobile) ...[
@@ -247,7 +248,7 @@ class MainScaffold extends ConsumerWidget {
                                   splashRadius: 16,
                                   padding: const EdgeInsets.all(4),
                                   constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                                  tooltip: 'Lock screen',
+                                  tooltip: 'Zablokuj ekran',
                                   onPressed: () => ref.read(currentUserProvider.notifier).logout(),
                                 ),
                               ],

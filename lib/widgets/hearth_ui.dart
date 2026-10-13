@@ -7,18 +7,65 @@ class HearthAvatar extends StatelessWidget {
   final String name;
   final Color? color;
   final double size;
+  final String? avatar;
 
   const HearthAvatar({
     super.key,
     required this.name,
     this.color,
     this.size = 32,
+    this.avatar,
   });
 
   @override
   Widget build(BuildContext context) {
     final avatarColor = color ?? AppTheme.muted;
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    Widget content;
+    if (avatar != null && avatar!.trim().isNotEmpty) {
+      final av = avatar!.trim();
+      if (av.startsWith('http://') || av.startsWith('https://')) {
+        content = ClipOval(
+          child: Image.network(
+            av,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Center(
+              child: Text(
+                initial,
+                style: GoogleFonts.newsreader(
+                  color: Colors.white,
+                  fontSize: size * 0.45,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+        );
+      } else {
+        content = Center(
+          child: Text(
+            av,
+            style: TextStyle(
+              fontSize: size * 0.52,
+            ),
+          ),
+        );
+      }
+    } else {
+      content = Center(
+        child: Text(
+          initial,
+          style: GoogleFonts.newsreader(
+            color: Colors.white,
+            fontSize: size * 0.45,
+            fontWeight: FontWeight.normal,
+          ),
+        ),
+      );
+    }
 
     return Container(
       width: size,
@@ -27,15 +74,7 @@ class HearthAvatar extends StatelessWidget {
         color: avatarColor,
         shape: BoxShape.circle,
       ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: GoogleFonts.newsreader(
-          color: Colors.white,
-          fontSize: size * 0.45,
-          fontWeight: FontWeight.normal,
-        ),
-      ),
+      child: content,
     );
   }
 }
@@ -43,12 +82,14 @@ class HearthAvatar extends StatelessWidget {
 class ResidentBadge extends StatelessWidget {
   final String name;
   final Color? color;
+  final String? avatar;
   final VoidCallback? onTap;
 
   const ResidentBadge({
     super.key,
     required this.name,
     this.color,
+    this.avatar,
     this.onTap,
   });
 
@@ -66,15 +107,20 @@ class ResidentBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            margin: const EdgeInsets.only(right: 6),
-            decoration: BoxDecoration(
-              color: badgeColor,
-              shape: BoxShape.circle,
+          if (avatar != null && avatar!.trim().isNotEmpty && !avatar!.startsWith('http')) ...[
+            Text(avatar!.trim(), style: const TextStyle(fontSize: 12)),
+            const SizedBox(width: 4),
+          ] else ...[
+            Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                color: badgeColor,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
+          ],
           Flexible(
             child: Text(
               name,

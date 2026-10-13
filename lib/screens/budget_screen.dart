@@ -21,7 +21,7 @@ class BudgetScreen extends ConsumerStatefulWidget {
 class _BudgetScreenState extends ConsumerState<BudgetScreen> {
   final TextEditingController _descCtrl = TextEditingController();
   final TextEditingController _amountCtrl = TextEditingController();
-  String _selectedType = 'Expense';
+  String _selectedType = 'Wydatek';
   String? _selectedCategory;
   String? _selectedAssignee;
 
@@ -38,8 +38,8 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     final assignee = _selectedAssignee ?? (users.isNotEmpty ? users.first.name : '');
 
     if (title.isNotEmpty && amount > 0 && assignee.isNotEmpty) {
-      if (_selectedType == 'Expense') {
-        final cat = _selectedCategory ?? (categories.isNotEmpty ? categories.first.name : 'General');
+      if (_selectedType == 'Wydatek' || _selectedType == 'Expense') {
+        final cat = _selectedCategory ?? (categories.isNotEmpty ? categories.first.name : 'Ogólne');
         ref.read(budgetControllerProvider).addExpense(title, amount, cat, assignee);
       } else {
         ref.read(budgetControllerProvider).addIncome(title, amount, assignee);
@@ -55,13 +55,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     final ctrl = TextEditingController(text: cat.limit.round().toString());
     showHearthModal(
       context: context,
-      title: 'Edit ${cat.name} Limit',
-      sub: 'Budget limit',
+      title: 'Edytuj limit dla: ${cat.name}',
+      sub: 'Limit wydatków',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Set monthly limit for ${cat.name} (USD):',
+            'Ustaw miesięczny limit dla kategorii ${cat.name} (w zł):',
             style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
           ),
           const SizedBox(height: 12),
@@ -69,7 +69,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             controller: ctrl,
             keyboardType: TextInputType.number,
             autofocus: true,
-            decoration: const InputDecoration(hintText: 'e.g. 500'),
+            decoration: const InputDecoration(hintText: 'np. 500'),
           ),
           const SizedBox(height: 20),
           SizedBox(
@@ -81,7 +81,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 ref.read(budgetControllerProvider).updateCategoryLimit(cat.id, newLimit);
                 Navigator.pop(context);
               },
-              child: const Text('Save Limit'),
+              child: const Text('Zapisz limit'),
             ),
           ),
         ],
@@ -117,7 +117,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
     // Settlement calculations
     final debtSummary = calculateDebt(budgetState.expenses, users);
-    final isBalanced = debtSummary.contains('balanced');
+    final isBalanced = debtSummary.contains('zrównoważone') || debtSummary.contains('Brak') || debtSummary.contains('balanced');
 
     // Resident Outflows & Incomes
     final flows = users.map((u) {
@@ -131,7 +131,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     // Transactions list combining expenses and incomes
     final allTransactions = [
       ...budgetState.expenses.map((e) => (id: e.id, title: e.title, amount: e.amount, date: e.date, type: 'Expense', assignee: e.assignee, category: e.category)),
-      ...budgetState.incomes.map((i) => (id: i.id, title: i.title, amount: i.amount, date: i.date, type: 'Income', assignee: i.assignee, category: 'Income')),
+      ...budgetState.incomes.map((i) => (id: i.id, title: i.title, amount: i.amount, date: i.date, type: 'Income', assignee: i.assignee, category: 'Przychód')),
     ];
     allTransactions.sort((a, b) => b.date.compareTo(a.date));
 
@@ -159,7 +159,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Row(
                     children: [
-                      HearthAvatar(name: flow.user.name, color: flow.user.color, size: 44),
+                      HearthAvatar(
+                        name: flow.user.name,
+                        color: flow.user.color,
+                        avatar: flow.user.avatar,
+                        size: 44,
+                      ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -176,11 +181,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                               spacing: 12,
                               children: [
                                 Text(
-                                  'In: \$${flow.income.round()}',
+                                  'Wpływy: ${flow.income.round()} zł',
                                   style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.moss),
                                 ),
                                 Text(
-                                  'Out: \$${flow.out.round()}',
+                                  'Wydatki: ${flow.out.round()} zł',
                                   style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                                 ),
                               ],
@@ -204,7 +209,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeader(sub: 'This month', title: 'Categories'),
+              const SectionHeader(sub: 'W tym miesiącu', title: 'Kategorie'),
               const SizedBox(height: 8),
               ListView.separated(
                 shrinkWrap: true,
@@ -227,7 +232,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                             ),
                           ),
                           Text(
-                            '${cat.currentSpent.round()} / ${cat.limit.round()} USD',
+                            '${cat.currentSpent.round()} / ${cat.limit.round()} zł',
                             style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                           ),
                           const SizedBox(width: 4),
@@ -257,23 +262,23 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       children: [
         // Transaction Form
         FormCard(
-          sub: 'New entry',
-          title: 'Log a transaction',
+          sub: 'Nowy wpis',
+          title: 'Zarejestruj transakcję',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               HearthSegmented<String>(
                 value: _selectedType,
-                options: const ['Expense', 'Income'],
+                options: const ['Wydatek', 'Przychód'],
                 onChanged: (val) => setState(() => _selectedType = val),
                 labelBuilder: (s) => s,
               ),
               const SizedBox(height: 16),
-              Text('Description', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+              Text('Opis', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
               const SizedBox(height: 6),
               TextField(
                 controller: _descCtrl,
-                decoration: const InputDecoration(hintText: 'e.g. Biedronka weekly shop'),
+                decoration: const InputDecoration(hintText: 'np. Zakupy w Biedronce'),
               ),
               const SizedBox(height: 16),
               Row(
@@ -282,7 +287,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Paid by', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                        Text('Kto płacił', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                         const SizedBox(height: 6),
                         HearthSelect<String>(
                           value: _selectedAssignee ?? '',
@@ -300,7 +305,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Amount (USD)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                        Text('Kwota (zł)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                         const SizedBox(height: 6),
                         TextField(
                           controller: _amountCtrl,
@@ -313,9 +318,9 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   ),
                 ],
               ),
-              if (_selectedType == 'Expense') ...[
+              if (_selectedType == 'Wydatek') ...[
                 const SizedBox(height: 16),
-                Text('Category', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                Text('Kategoria', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                 const SizedBox(height: 6),
                 HearthSelect<String>(
                   value: _selectedCategory ?? '',
@@ -332,7 +337,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                 height: 44,
                 child: ElevatedButton(
                   onPressed: () => _submitTransaction(budgetState.categories, users),
-                  child: Text('Log ${_selectedType.toLowerCase()}'),
+                  child: Text(_selectedType == 'Wydatek' ? 'Dodaj wydatek' : 'Dodaj przychód'),
                 ),
               ),
             ],
@@ -348,12 +353,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
-                child: SectionHeader(sub: 'Swipe left to delete', title: 'Recent'),
+                child: SectionHeader(sub: 'Przesuń w lewo, aby usunąć', title: 'Ostatnie transakcje'),
               ),
               if (allTransactions.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(24.0),
-                  child: Text('No transactions logged.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
+                  child: Text('Brak zarejestrowanych transakcji.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
                 )
               else
                 ListView.separated(
@@ -378,7 +383,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           children: [
                             Icon(Icons.delete_outline, color: Colors.white, size: 18),
                             SizedBox(width: 6),
-                            Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                            Text('Usuń', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
@@ -386,7 +391,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                         FirebaseFirestore.instance.collection('budget_transactions').doc(tx.id).delete();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Deleted "${tx.title}"'),
+                            content: Text('Usunięto "${tx.title}"'),
                             backgroundColor: AppTheme.ink,
                           ),
                         );
@@ -414,7 +419,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                               ),
                             ),
                             Text(
-                              '$sign\$${tx.amount.round()} USD',
+                              '$sign${tx.amount.round()} zł',
                               style: GoogleFonts.dmMono(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -452,7 +457,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SETTLEMENT BALANCE',
+                        'ROZLICZENIE WYDATKÓW',
                         style: AppTheme.microStyle.copyWith(color: AppTheme.moss.withValues(alpha: 0.8)),
                       ),
                       const SizedBox(height: 6),
@@ -470,12 +475,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                       : () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Settlement settled!'),
+                              content: Text('Wydatki zostały rozliczone!'),
                               backgroundColor: AppTheme.moss,
                             ),
                           );
                         },
-                  child: const Text('Settle Up'),
+                  child: const Text('Rozlicz się'),
                 ),
               ],
             ),

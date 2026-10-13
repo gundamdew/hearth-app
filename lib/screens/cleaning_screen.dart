@@ -16,7 +16,7 @@ class CleaningScreen extends ConsumerStatefulWidget {
 
 class _CleaningScreenState extends ConsumerState<CleaningScreen> {
   final TextEditingController _taskNameCtrl = TextEditingController();
-  final TextEditingController _roomCtrl = TextEditingController(text: 'Kitchen');
+  final TextEditingController _roomCtrl = TextEditingController(text: 'Kuchnia');
   String? _selectedAssignee;
 
   @override
@@ -70,7 +70,12 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  HearthAvatar(name: user.name, color: user.color, size: 44),
+                  HearthAvatar(
+                    name: user.name,
+                    color: user.color,
+                    avatar: user.avatar,
+                    size: 44,
+                  ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -118,21 +123,21 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
           onPressed: () {
             ref.read(cleaningControllerProvider).balanceLoad(chores, userNames);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Chores evenly redistributed'), backgroundColor: AppTheme.moss),
+              const SnackBar(content: Text('Zadania zostały równomiernie podzielone'), backgroundColor: AppTheme.moss),
             );
           },
           icon: const Icon(Icons.balance, size: 16),
-          label: const Text('Balance load'),
+          label: const Text('Wyrównaj zadania'),
         ),
         OutlinedButton.icon(
           onPressed: () {
             ref.read(cleaningControllerProvider).swapAndNewWeek(chores, userNames);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('New week started — assignments rotated'), backgroundColor: AppTheme.moss),
+              const SnackBar(content: Text('Nowy tydzień — rotacja przypisań wykonana'), backgroundColor: AppTheme.moss),
             );
           },
           icon: const Icon(Icons.sync, size: 16),
-          label: const Text('Swap & new week'),
+          label: const Text('Nowy tydzień i rotacja'),
         ),
       ],
     );
@@ -172,10 +177,10 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                 const Padding(
                   padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
                   child: SectionHeader(
-                    sub: 'This week',
-                    title: 'Chores',
+                    sub: 'W tym tygodniu',
+                    title: 'Obowiązki domowe',
                     action: Text(
-                      'Tap a name to reassign',
+                      'Dotknij osoby, aby zmienić przypisanie',
                       style: TextStyle(fontSize: 12, color: AppTheme.muted),
                     ),
                   ),
@@ -183,7 +188,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                 if (chores.isEmpty)
                   Padding(
                     padding: const EdgeInsets.all(24.0),
-                    child: Text('No chores added.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
+                    child: Text('Brak dodanych zadań.', style: AppTheme.titleStyle(fontSize: 18, color: AppTheme.muted)),
                   )
                 else
                   ListView.separated(
@@ -208,7 +213,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                             children: [
                               Icon(Icons.delete_outline, color: Colors.white, size: 18),
                               SizedBox(width: 6),
-                              Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                              Text('Usuń', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
@@ -216,10 +221,10 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                           ref.read(cleaningControllerProvider).deleteChore(chore.id);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Deleted "${chore.name}"'),
+                              content: Text('Usunięto "${chore.name}"'),
                               backgroundColor: AppTheme.ink,
                               action: SnackBarAction(
-                                label: 'UNDO',
+                                label: 'COFNIJ',
                                 textColor: AppTheme.sage,
                                 onPressed: () {
                                   ref.read(cleaningControllerProvider).addChore(
@@ -269,6 +274,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                               ResidentBadge(
                                 name: chore.assignee,
                                 color: assignedUser?.color,
+                                avatar: assignedUser?.avatar,
                                 onTap: () {
                                   ref.read(cleaningControllerProvider).changeAssignee(
                                     chore.id,
@@ -298,7 +304,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                       final taskInput = TextField(
                         controller: _taskNameCtrl,
                         decoration: const InputDecoration(
-                          hintText: 'e.g. Descale the kettle',
+                          hintText: 'np. Odkamienić czajnik',
                           fillColor: Colors.white,
                         ),
                       );
@@ -306,7 +312,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                       final roomInput = TextField(
                         controller: _roomCtrl,
                         decoration: const InputDecoration(
-                          hintText: 'Kitchen',
+                          hintText: 'Kuchnia',
                           fillColor: Colors.white,
                         ),
                       );
@@ -323,7 +329,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                       final addBtn = ElevatedButton.icon(
                         onPressed: () {
                           final name = _taskNameCtrl.text.trim();
-                          final room = _roomCtrl.text.trim().isEmpty ? 'General' : _roomCtrl.text.trim();
+                          final room = _roomCtrl.text.trim().isEmpty ? 'Kuchnia' : _roomCtrl.text.trim();
                           final assignee = _selectedAssignee ?? (userNames.isNotEmpty ? userNames.first : '');
 
                           if (name.isNotEmpty && assignee.isNotEmpty) {
@@ -333,7 +339,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                           }
                         },
                         icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add task'),
+                        label: const Text('Dodaj zadanie'),
                       );
 
                       if (useHorizontal) {
@@ -345,7 +351,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Task name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  Text('Nazwa zadania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                                   const SizedBox(height: 6),
                                   taskInput,
                                 ],
@@ -357,7 +363,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Room', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  Text('Pomieszczenie', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                                   const SizedBox(height: 6),
                                   roomInput,
                                 ],
@@ -369,7 +375,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Assignee', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                  Text('Osoba', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                                   const SizedBox(height: 6),
                                   assigneeSelect,
                                 ],
@@ -384,7 +390,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text('Task name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                          Text('Nazwa zadania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                           const SizedBox(height: 6),
                           taskInput,
                           const SizedBox(height: 12),
@@ -394,7 +400,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Room', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                    Text('Pomieszczenie', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                                     const SizedBox(height: 6),
                                     roomInput,
                                   ],
@@ -405,7 +411,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Assignee', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                                    Text('Osoba', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                                     const SizedBox(height: 6),
                                     assigneeSelect,
                                   ],

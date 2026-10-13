@@ -34,6 +34,32 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     super.dispose();
   }
 
+  String _locLabel(String loc) {
+    switch (loc) {
+      case 'Fridge':
+        return 'LODÓWKA';
+      case 'Pantry':
+        return 'SPIŻARNIA';
+      case 'Household':
+        return 'CHEMIA DOMOWA';
+      default:
+        return loc.toUpperCase();
+    }
+  }
+
+  String _locDisplay(String loc) {
+    switch (loc) {
+      case 'Fridge':
+        return 'Lodówka';
+      case 'Pantry':
+        return 'Spiżarnia';
+      case 'Household':
+        return 'Chemia domowa';
+      default:
+        return loc;
+    }
+  }
+
   void _showBulkImportModal(BuildContext context, List<InventoryItem> existingItems) {
     final textCtrl = TextEditingController(
       text: '* Kurczak – 2 szt.\n* Masło – 6 szt.\n- Passata pomidorowa - 3 op.\n• Szpinak – 1 op.',
@@ -41,8 +67,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
     showHearthModal(
       context: context,
-      title: 'Paste Shopping List',
-      sub: 'Bulk import',
+      title: 'Wklej listę zakupów',
+      sub: 'Import zbiorczy',
       child: StatefulBuilder(
         builder: (modalCtx, setModalState) {
           final rawText = textCtrl.text;
@@ -68,7 +94,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Paste a message from chat. One item per line — Name – qty unit.',
+                'Wklej wiadomość z czatu lub listy. Jedna pozycja w wierszu — Nazwa – ilość jednostka.',
                 style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
               ),
               const SizedBox(height: 12),
@@ -82,7 +108,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 onChanged: (_) => setModalState(() {}),
               ),
               const SizedBox(height: 16),
-              Text('PREVIEW · $validCount RECOGNISED', style: AppTheme.microStyle),
+              Text('PODGLĄD · ROZPOZNANO: $validCount', style: AppTheme.microStyle),
               const SizedBox(height: 8),
               Container(
                 constraints: const BoxConstraints(maxHeight: 180),
@@ -117,7 +143,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                row.isExisting ? 'UPDATE' : 'NEW',
+                                row.isExisting ? 'AKTUALIZACJA' : 'NOWY',
                                 style: GoogleFonts.instrumentSans(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
@@ -173,13 +199,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('$count items restocked/updated'),
+                                content: Text('$count pozycji zaktualizowano w spiżarni'),
                                 backgroundColor: AppTheme.moss,
                               ),
                             );
                           }
                         },
-                  child: const Text('Update stock'),
+                  child: const Text('Zaktualizuj spiżarnię'),
                 ),
               ),
             ],
@@ -234,7 +260,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  'All',
+                  'Wszystko',
                   style: TextStyle(
                     color: _filter == 'All' ? Colors.white : AppTheme.muted,
                     fontSize: 14,
@@ -261,7 +287,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Running low',
+                      'Kończące się',
                       style: TextStyle(
                         color: _filter == 'Running low' ? Colors.white : AppTheme.muted,
                         fontSize: 14,
@@ -294,7 +320,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             OutlinedButton.icon(
               onPressed: () => _showBulkImportModal(context, inventory),
               icon: const Icon(Icons.paste, size: 16, color: AppTheme.moss),
-              label: const Text('Paste list', style: TextStyle(color: AppTheme.moss, fontWeight: FontWeight.w500)),
+              label: const Text('Wklej listę', style: TextStyle(color: AppTheme.moss, fontWeight: FontWeight.w500)),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: AppTheme.moss.withValues(alpha: 0.3)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
@@ -304,13 +330,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
             // Search Bar
             SizedBox(
-              width: 200,
+              width: 220,
               height: 40,
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: 'Search items',
+                  hintText: 'Szukaj produktów...',
                   prefixIcon: const Icon(Icons.search, size: 16, color: AppTheme.muted),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                   fillColor: Colors.white,
@@ -329,7 +355,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             padding: const EdgeInsets.symmetric(vertical: 64.0),
             child: Center(
               child: Text(
-                'No items match.',
+                'Brak pasujących pozycji.',
                 style: AppTheme.titleStyle(fontSize: 22, color: AppTheme.muted, fontStyle: FontStyle.italic),
               ),
             ),
@@ -348,7 +374,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     padding: const EdgeInsets.only(bottom: 8.0, left: 4),
                     child: Row(
                       children: [
-                        Text(loc.toUpperCase(), style: AppTheme.microStyle),
+                        Text(_locLabel(loc), style: AppTheme.microStyle),
                         const SizedBox(width: 6),
                         Text('${locItems.length}', style: GoogleFonts.dmMono(fontSize: 11, color: AppTheme.muted)),
                       ],
@@ -378,7 +404,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               children: [
                                 Icon(Icons.delete_outline, color: Colors.white, size: 18),
                                 SizedBox(width: 6),
-                                Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+                                Text('Usuń', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
                               ],
                             ),
                           ),
@@ -386,10 +412,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             ref.read(inventoryControllerProvider).removeItem(item.id);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('Removed ${item.name}'),
+                                content: Text('Usunięto ${item.name}'),
                                 backgroundColor: AppTheme.ink,
                                 action: SnackBarAction(
-                                  label: 'UNDO',
+                                  label: 'COFNIJ',
                                   textColor: AppTheme.sage,
                                   onPressed: () {
                                     ref.read(inventoryControllerProvider).addItem(
@@ -430,7 +456,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                                 borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
-                                                'LOW',
+                                                'NISKI STAN',
                                                 style: GoogleFonts.instrumentSans(
                                                   color: AppTheme.danger,
                                                   fontSize: 10,
@@ -444,7 +470,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Restock below ${item.lowStockThreshold}',
+                                        'Uzupełnij poniżej ${item.lowStockThreshold}',
                                         style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
                                       ),
                                     ],
@@ -505,19 +531,19 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     );
 
     final rightPanel = FormCard(
-      sub: 'Stock',
-      title: 'Add an item',
+      sub: 'Zapasy',
+      title: 'Dodaj produkt',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Item name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Nazwa produktu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
-            decoration: const InputDecoration(hintText: 'e.g. Pomidory koktajlowe'),
+            decoration: const InputDecoration(hintText: 'np. Pomidory koktajlowe'),
           ),
           const SizedBox(height: 16),
-          Text('Location', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Miejsce przechowywania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
           const SizedBox(height: 6),
           HearthSelect<String>(
             value: _selectedLoc,
@@ -525,7 +551,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             onChanged: (val) {
               if (val != null) setState(() => _selectedLoc = val);
             },
-            labelBuilder: (l) => l,
+            labelBuilder: _locDisplay,
           ),
           const SizedBox(height: 16),
           Row(
@@ -534,7 +560,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Qty', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Ilość', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _qtyCtrl,
@@ -550,11 +576,11 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Unit', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Jednostka', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                     const SizedBox(height: 6),
                     HearthSelect<String>(
                       value: _selectedUnit,
-                      items: const ['szt.', 'op.', 'porcja'],
+                      items: const ['szt.', 'op.', 'porcja', 'kg', 'l'],
                       onChanged: (val) {
                         if (val != null) setState(() => _selectedUnit = val);
                       },
@@ -568,7 +594,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Min', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Min. stan', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _minCtrl,
@@ -604,7 +630,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                   FocusScope.of(context).unfocus();
                 }
               },
-              child: const Text('Add to inventory'),
+              child: const Text('Dodaj do spiżarni'),
             ),
           ),
         ],

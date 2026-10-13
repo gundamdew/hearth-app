@@ -108,8 +108,8 @@ class BudgetController {
 }
 
 String calculateDebt(List<Expense> expenses, List<AppUser> users) {
-  if (users.isEmpty) return 'No residents added.';
-  if (users.length == 1) return 'Contributions are balanced.';
+  if (users.isEmpty) return 'Brak dodanych domowników.';
+  if (users.length == 1) return 'Wydatki są zrównoważone.';
 
   final totalExpenses = expenses.fold(0.0, (total, e) => total + e.amount);
   final fairShare = totalExpenses / users.length;
@@ -121,10 +121,10 @@ String calculateDebt(List<Expense> expenses, List<AppUser> users) {
         .fold(0.0, (total, e) => total + e.amount);
     
     if (spent < fairShare - 0.5) { 
-      debtors.add('${user.name} owes \$${(fairShare - spent).toStringAsFixed(0)}');
+      debtors.add('${user.name} wisi ${(fairShare - spent).toStringAsFixed(0)} zł');
     }
   }
 
-  if (debtors.isEmpty) return 'Contributions are perfectly balanced.';
+  if (debtors.isEmpty) return 'Wydatki są idealnie zrównoważone.';
   return debtors.join('  ·  ');
 }

@@ -14,96 +14,213 @@ class SettingsScreen extends ConsumerWidget {
   void _showResidentDialog(BuildContext context, WidgetRef ref, [AppUser? user]) {
     final nameCtrl = TextEditingController(text: user?.name ?? '');
     final pinCtrl = TextEditingController(text: user?.pinCode ?? '');
+    final avatarCtrl = TextEditingController(text: user?.avatar ?? '');
     Color pickedColor = user?.color ?? AppTheme.residentColors[0];
+    String? pickedAvatar = user?.avatar;
+
+    const avatarPresets = [
+      '🦊', '🐱', '🐼', '🐻', '🐰', '🦁', '🌿', '☕',
+      '🍕', '🏡', '🎨', '🚀', '🎮', '⚡', '🌻', '✨',
+    ];
 
     showHearthModal(
       context: context,
-      title: user == null ? 'Add Resident' : 'Edit Resident',
-      sub: 'Resident',
+      title: user == null ? 'Dodaj domownika' : 'Edytuj domownika',
+      sub: 'Domownik',
       child: StatefulBuilder(
         builder: (modalCtx, setModalState) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Name', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(hintText: 'e.g. Vladimir'),
-                onChanged: (_) => setModalState(() {}),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                user == null ? '4-digit PIN' : 'New 4-digit PIN (leave blank to keep)',
-                style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: pinCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                obscureText: true,
-                style: GoogleFonts.dmMono(fontSize: 16, letterSpacing: 8),
-                decoration: const InputDecoration(
-                  hintText: '••••',
-                  counterText: '',
-                ),
-                onChanged: (_) => setModalState(() {}),
-              ),
-              const SizedBox(height: 16),
-              Text('Signature color', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-              const SizedBox(height: 10),
-              Row(
-                children: AppTheme.residentColors.map((color) {
-                  final isSelected = pickedColor == color;
-                  return GestureDetector(
-                    onTap: () => setModalState(() => pickedColor = color),
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 12),
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                        border: isSelected
-                            ? Border.all(color: Colors.white, width: 2)
-                            : null,
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: color.withValues(alpha: 0.6),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                )
-                              ]
-                            : null,
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar preview & header
+                Center(
+                  child: Column(
+                    children: [
+                      HearthAvatar(
+                        name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : '?',
+                        color: pickedColor,
+                        avatar: pickedAvatar,
+                        size: 56,
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: nameCtrl.text.trim().isEmpty || (user == null && pinCtrl.text.length != 4)
-                      ? null
-                      : () {
-                          final name = nameCtrl.text.trim();
-                          final pin = pinCtrl.text.trim().isNotEmpty ? pinCtrl.text.trim() : (user?.pinCode ?? '1234');
-
-                          if (user == null) {
-                            ref.read(usersControllerProvider).addUser(name, pin, pickedColor);
-                          } else {
-                            ref.read(usersControllerProvider).updateUser(user.id, name, pin);
-                          }
-                          Navigator.pop(modalCtx);
-                        },
-                  child: const Text('Save resident'),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Podgląd awatara',
+                        style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Name
+                Text('Imię', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(hintText: 'np. Vladimir'),
+                  onChanged: (_) => setModalState(() {}),
+                ),
+                const SizedBox(height: 16),
+
+                // PIN
+                Text(
+                  user == null ? '4-cyfrowy PIN' : 'Nowy 4-cyfrowy PIN (pozostaw puste, aby zachować)',
+                  style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: pinCtrl,
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  obscureText: true,
+                  style: GoogleFonts.dmMono(fontSize: 16, letterSpacing: 8),
+                  decoration: const InputDecoration(
+                    hintText: '••••',
+                    counterText: '',
+                  ),
+                  onChanged: (_) => setModalState(() {}),
+                ),
+                const SizedBox(height: 16),
+
+                // Avatar Presets
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Wybierz awatar', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    if (pickedAvatar != null)
+                      GestureDetector(
+                        onTap: () {
+                          setModalState(() {
+                            pickedAvatar = null;
+                            avatarCtrl.clear();
+                          });
+                        },
+                        child: Text(
+                          'Wyczyść (użyj inicjałów)',
+                          style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.terra, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: avatarPresets.map((emoji) {
+                    final isSelected = pickedAvatar == emoji;
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          pickedAvatar = emoji;
+                          avatarCtrl.text = emoji;
+                        });
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.moss.withValues(alpha: 0.15) : AppTheme.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.moss : AppTheme.line,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(emoji, style: const TextStyle(fontSize: 18)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
+
+                // Custom Avatar Input (URL or custom emoji)
+                Text('Własny awatar (link URL lub własne emoji)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: avatarCtrl,
+                  decoration: const InputDecoration(
+                    hintText: 'https://... lub dowolne emoji',
+                    prefixIcon: Icon(Icons.link, size: 18, color: AppTheme.muted),
+                  ),
+                  onChanged: (val) {
+                    setModalState(() {
+                      pickedAvatar = val.trim().isNotEmpty ? val.trim() : null;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Color Selection
+                Text('Kolor profilu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                const SizedBox(height: 10),
+                Row(
+                  children: AppTheme.residentColors.map((color) {
+                    final isSelected = pickedColor == color;
+                    return GestureDetector(
+                      onTap: () => setModalState(() => pickedColor = color),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 2)
+                              : null,
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.6),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : null,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: nameCtrl.text.trim().isEmpty || (user == null && pinCtrl.text.length != 4)
+                        ? null
+                        : () {
+                            final name = nameCtrl.text.trim();
+                            final pin = pinCtrl.text.trim().isNotEmpty ? pinCtrl.text.trim() : (user?.pinCode ?? '1234');
+                            final avatar = pickedAvatar?.trim().isNotEmpty == true ? pickedAvatar!.trim() : null;
+
+                            if (user == null) {
+                              ref.read(usersControllerProvider).addUser(name, pin, pickedColor, avatar);
+                            } else {
+                              ref.read(usersControllerProvider).updateUser(user.id, name, pin, pickedColor, avatar);
+                              final currentUser = ref.read(currentUserProvider);
+                              if (currentUser?.id == user.id) {
+                                ref.read(currentUserProvider.notifier).login(
+                                  currentUser!.copyWith(
+                                    name: name,
+                                    pinCode: pin,
+                                    color: pickedColor,
+                                    avatar: avatar,
+                                  ),
+                                );
+                              }
+                            }
+                            Navigator.pop(modalCtx);
+                          },
+                    child: const Text('Zapisz domownika'),
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -131,12 +248,12 @@ class SettingsScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionHeader(
-                sub: 'Household',
-                title: 'Household Settings',
+                sub: 'Domownicy',
+                title: 'Ustawienia domowników',
                 action: ElevatedButton.icon(
                   onPressed: () => _showResidentDialog(context, ref),
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Resident'),
+                  label: const Text('Dodaj domownika'),
                 ),
               ),
               const SizedBox(height: 8),
@@ -156,7 +273,7 @@ class SettingsScreen extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       child: Row(
                         children: [
-                          HearthAvatar(name: user.name, color: user.color, size: 44),
+                          HearthAvatar(name: user.name, color: user.color, avatar: user.avatar, size: 44),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -174,7 +291,7 @@ class SettingsScreen extends ConsumerWidget {
                                     if (isCurrent) ...[
                                       const SizedBox(width: 6),
                                       Text(
-                                        '(you)',
+                                        '(Ty)',
                                         style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
                                       ),
                                     ],
@@ -191,11 +308,13 @@ class SettingsScreen extends ConsumerWidget {
                           IconButton(
                             icon: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.muted),
                             splashRadius: 18,
+                            tooltip: 'Edytuj domownika',
                             onPressed: () => _showResidentDialog(context, ref, user),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.muted),
                             splashRadius: 18,
+                            tooltip: 'Usuń domownika',
                             onPressed: isCurrent
                                 ? null
                                 : () => ref.read(usersControllerProvider).deleteUser(user.id),

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/meal_models.dart';
 import '../models/inventory_item.dart';
@@ -37,7 +36,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
 
     showHearthModal(
       context: context,
-      title: 'Assign Recipe',
+      title: 'Przypisz przepis',
       sub: dayLabel,
       child: Column(
         children: recipes.map((recipe) {
@@ -76,7 +75,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${recipe.ingredients.length} ingredients · ${recipe.prepTime ?? 30} min',
+                          '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
                           style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                         ),
                       ],
@@ -84,7 +83,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                   ),
                   if (missingCount > 0)
                     Text(
-                      '$missingCount missing',
+                      'Brak: $missingCount',
                       style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.danger, fontWeight: FontWeight.w500),
                     )
                   else
@@ -104,9 +103,12 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
     final target = DateTime(date.year, date.month, date.day);
     final diff = target.difference(today).inDays;
 
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Tomorrow';
-    return DateFormat('EEEE, MMM d').format(date);
+    if (diff == 0) return 'Dziś';
+    if (diff == 1) return 'Jutro';
+    
+    const weekdays = ['Pon.', 'Wt.', 'Śr.', 'Czw.', 'Pt.', 'Sob.', 'Niedz.'];
+    const months = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+    return '${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}';
   }
 
   @override
@@ -133,10 +135,10 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeader(
-          sub: 'Next 14 days',
-          title: 'Upcoming Menu',
+          sub: 'Kolejne 14 dni',
+          title: 'Nadchodzące menu',
           action: Text(
-            '$plannedCount of 14 planned',
+            '$plannedCount z 14 zaplanowanych',
             style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
           ),
         ),
@@ -150,7 +152,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             itemBuilder: (context, index) {
               final plan = mealPlans[index];
               final dayLabel = _getDayLabel(plan.date);
-              final isToday = dayLabel == 'Today';
+              final isToday = dayLabel == 'Dziś';
               final recipeMatches = recipes.where((r) => r.id == plan.recipeId);
               final recipe = recipeMatches.isNotEmpty ? recipeMatches.first : null;
 
@@ -265,7 +267,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                             const Icon(Icons.check, size: 12, color: AppTheme.moss),
                             const SizedBox(width: 4),
                             Text(
-                              'Done',
+                              'Gotowe',
                               style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.moss),
                             ),
                           ],
@@ -286,7 +288,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                               const Icon(Icons.soup_kitchen, size: 12, color: Colors.white),
                               const SizedBox(width: 4),
                               Text(
-                                'Cook',
+                                'Gotuj',
                                 style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white),
                               ),
                             ],
@@ -306,7 +308,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
     final recipeBoxSection = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(sub: '${recipes.length} recipes', title: 'Recipe Box'),
+        SectionHeader(sub: '${recipes.length} przepisów', title: 'Książka przepisów'),
         LayoutBuilder(
           builder: (context, constraints) {
             final useTwoCols = constraints.maxWidth >= 450;
@@ -337,7 +339,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${r.ingredients.length} ingredients · ${r.prepTime ?? 30} min',
+                        '${r.ingredients.length} składników · ${r.prepTime ?? 30} min',
                         style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                       ),
                       const Spacer(),
@@ -388,8 +390,8 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
 
     // Draft Recipe Form
     final recipeForm = FormCard(
-      sub: 'Recipe box',
-      title: 'Draft New Recipe',
+      sub: 'Książka przepisów',
+      title: 'Utwórz nowy przepis',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -400,11 +402,11 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Recipe title', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Nazwa przepisu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _recipeNameCtrl,
-                      decoration: const InputDecoration(hintText: 'e.g. Pierogi ruskie'),
+                      decoration: const InputDecoration(hintText: 'np. Pierogi ruskie'),
                     ),
                   ],
                 ),
@@ -415,7 +417,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Prep (min)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Czas (min)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _prepTimeCtrl,
@@ -429,7 +431,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Ingredients', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Składniki', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
           const SizedBox(height: 6),
 
           // Added ingredients list
@@ -484,7 +486,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
               Expanded(
                 child: HearthSelect<String>(
                   value: _selectedInventoryId ?? '',
-                  placeholder: 'Select from inventory',
+                  placeholder: 'Wybierz ze spiżarni',
                   items: inventory.map((i) => i.id).toList(),
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedInventoryId = val);
@@ -518,7 +520,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       });
                     },
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add ingredient'),
+              label: const Text('Dodaj składnik'),
             ),
           ),
           const SizedBox(height: 20),
@@ -539,7 +541,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       });
                       FocusScope.of(context).unfocus();
                     },
-              child: const Text('Save to Recipe Box'),
+              child: const Text('Zapisz przepis'),
             ),
           ),
         ],

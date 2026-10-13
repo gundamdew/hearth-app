@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../models/user_model.dart';
 import '../providers/users_provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/hearth_ui.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -42,7 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       return;
     }
 
-    if (key == 'Cancel') {
+    if (key == 'Anuluj' || key == 'Cancel') {
       setState(() {
         _selectedUser = null;
         _enteredPin = '';
@@ -51,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       return;
     }
 
-    if (key == 'Del') {
+    if (key == 'Usuń' || key == 'Del') {
       if (_enteredPin.isNotEmpty) {
         setState(() {
           _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
@@ -79,7 +80,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
           _shakeController.forward(from: 0.0);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Incorrect PIN', style: TextStyle(color: Colors.white)),
+              content: Text('Nieprawidłowy PIN', style: TextStyle(color: Colors.white)),
               backgroundColor: AppTheme.danger,
               duration: Duration(seconds: 1),
             ),
@@ -139,7 +140,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 64),
                   child: usersAsync.when(
                     loading: () => const CircularProgressIndicator(color: AppTheme.moss),
-                    error: (err, _) => Text('Error loading users: $err', style: const TextStyle(color: AppTheme.danger)),
+                    error: (err, _) => Text('Błąd ładowania użytkowników: $err', style: const TextStyle(color: AppTheme.danger)),
                     data: (users) {
                       if (_selectedUser == null) {
                         return _buildResidentPicker(context, users);
@@ -166,18 +167,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('FIRST RESIDENT', style: AppTheme.microStyle),
+            Text('PIERWSZY DOMOWNIK', style: AppTheme.microStyle),
             const SizedBox(height: 6),
-            Text('Set up your household', style: AppTheme.titleStyle(fontSize: 24)),
+            Text('Skonfiguruj swój dom', style: AppTheme.titleStyle(fontSize: 24)),
             const SizedBox(height: 8),
             Text(
-              'The database is empty. Create the first resident to begin — you can add others later in Settings.',
+              'Baza danych jest pusta. Dodaj pierwszego domownika, aby rozpocząć — kolejnych dodasz w Ustawieniach.',
               style: GoogleFonts.instrumentSans(color: AppTheme.muted, fontSize: 14),
             ),
             const SizedBox(height: 20),
             TextField(
               controller: _firstNameCtrl,
-              decoration: const InputDecoration(hintText: 'Your name'),
+              decoration: const InputDecoration(hintText: 'Twoje imię'),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
@@ -196,7 +197,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         );
                         _firstNameCtrl.clear();
                       },
-                child: const Text('Create resident · PIN 1234'),
+                child: const Text('Utwórz domownika · PIN 1234'),
               ),
             ),
           ],
@@ -207,9 +208,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('SHARED HOUSEHOLD', style: AppTheme.microStyle),
+        Text('WSPÓLNY DOM', style: AppTheme.microStyle),
         const SizedBox(height: 8),
-        Text('Who is using the screen?', style: AppTheme.titleStyle(fontSize: 36)),
+        Text('Kto korzysta z ekranu?', style: AppTheme.titleStyle(fontSize: 36)),
         const SizedBox(height: 36),
         Wrap(
           spacing: 20,
@@ -229,28 +230,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 84,
-                      height: 84,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: user.color,
-                        boxShadow: [
-                          BoxShadow(
-                            color: user.color.withValues(alpha: 0.35),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                        style: GoogleFonts.newsreader(
-                          fontSize: 38,
-                          color: Colors.white,
-                        ),
-                      ),
+                    HearthAvatar(
+                      name: user.name,
+                      color: user.color,
+                      avatar: user.avatar,
+                      size: 84,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -266,7 +250,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         const Icon(Icons.lock_outline, size: 12, color: AppTheme.muted),
                         const SizedBox(width: 4),
                         Text(
-                          'PIN protected',
+                          'Chronione PIN-em',
                           style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
                         ),
                       ],
@@ -285,23 +269,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: user.color,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-            style: GoogleFonts.newsreader(fontSize: 26, color: Colors.white),
-          ),
+        HearthAvatar(
+          name: user.name,
+          color: user.color,
+          avatar: user.avatar,
+          size: 56,
         ),
         const SizedBox(height: 16),
-        Text('Enter PIN for ${user.name}', style: AppTheme.titleStyle(fontSize: 28)),
+        Text('Wprowadź PIN dla: ${user.name}', style: AppTheme.titleStyle(fontSize: 28)),
         const SizedBox(height: 4),
-        Text('Demo PIN · 1234', style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted)),
+        Text('Domyślny PIN · 1234', style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted)),
         const SizedBox(height: 32),
 
         // Dots
@@ -352,7 +329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
               '1', '2', '3',
               '4', '5', '6',
               '7', '8', '9',
-              'Cancel', '0', 'Del'
+              'Anuluj', '0', 'Usuń'
             ].map((key) => _buildKeyButton(key)).toList(),
           ),
         ),
@@ -361,7 +338,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   }
 
   Widget _buildKeyButton(String key) {
-    final isAction = key == 'Cancel' || key == 'Del';
+    final isAction = key == 'Anuluj' || key == 'Usuń';
 
     return GestureDetector(
       onTap: () => _handleKeyPress(key),

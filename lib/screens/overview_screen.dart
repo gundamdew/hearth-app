@@ -74,8 +74,14 @@ class OverviewScreen extends ConsumerWidget {
     // Chores done count
     final choresDoneCount = chores.where((c) => c.isDone).length;
 
-    final dateFormatted = DateFormat('EEEE, MMMM d').format(DateTime.now());
+    final now = DateTime.now();
+    const weekdays = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+    const months = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
+    final dateFormatted = '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
     final residentsSubtitle = users.map((u) => u.name).join(' & ');
+
+    final hour = now.hour;
+    final greeting = (hour >= 18 || hour < 5) ? 'Dobry wieczór' : 'Dzień dobry';
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -93,7 +99,7 @@ class OverviewScreen extends ConsumerWidget {
 
           // Main Title
           Text(
-            'Good evening, ${currentUser?.name ?? "friend"}.',
+            '$greeting, ${currentUser?.name ?? "domowniku"}.',
             style: AppTheme.titleStyle(fontSize: isDesktop ? 48 : 34),
           ),
           SizedBox(height: isDesktop ? 32 : 24),
@@ -154,7 +160,7 @@ class OverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('LEFT TO SPEND THIS MONTH', style: AppTheme.microStyle),
+              Text('DO WYDANIA W TYM MIESIĄCU', style: AppTheme.microStyle),
               IconButton(
                 icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.muted),
                 onPressed: () => context.go('/budget'),
@@ -166,7 +172,7 @@ class OverviewScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            '\$${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} USD',
+            '${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} zł',
             style: GoogleFonts.dmMono(
               fontSize: 44,
               fontWeight: FontWeight.w400,
@@ -186,18 +192,18 @@ class OverviewScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '\$${spent.round()} spent',
+                    '${spent.round()} zł wydano',
                     style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                   ),
                   Text(
-                    '${(ratio * 100).round()}% of \$${limit.round()}',
+                    '${(ratio * 100).round()}% z ${limit.round()} zł',
                     style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                'Income logged · \$${income.round()} USD',
+                'Zarejestrowany przychód · ${income.round()} zł',
                 style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
               ),
             ],
@@ -221,9 +227,9 @@ class OverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('TONIGHT\'S DINNER · TODAY', style: AppTheme.microStyle),
+              Text('DZISIEJSZY OBIAD · DZIŚ', style: AppTheme.microStyle),
               Text(
-                '$plannedCount of 14 planned',
+                '$plannedCount z 14 zaplanowanych',
                 style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
               ),
             ],
@@ -238,12 +244,12 @@ class OverviewScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${recipe.ingredients.length} ingredients · ${recipe.prepTime ?? 30} min',
+              '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
               style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
             ),
           ] else ...[
             Text(
-              'Nothing planned yet',
+              'Brak planów na dzisiaj',
               style: AppTheme.titleStyle(fontSize: 26, color: AppTheme.muted, fontStyle: FontStyle.italic),
             ),
           ],
@@ -265,7 +271,7 @@ class OverviewScreen extends ConsumerWidget {
                         const Icon(Icons.check, size: 16, color: AppTheme.moss),
                         const SizedBox(width: 6),
                         Text(
-                          'Cooked',
+                          'Ugotowane',
                           style: GoogleFonts.instrumentSans(
                             color: AppTheme.moss,
                             fontSize: 14,
@@ -280,12 +286,12 @@ class OverviewScreen extends ConsumerWidget {
                     onPressed: () {
                       ref.read(mealsControllerProvider).markCooked(plan.id, recipe.id);
                     },
-                    child: const Text('Mark cooked'),
+                    child: const Text('Oznacz jako ugotowane'),
                   ),
               ] else ...[
                 OutlinedButton(
                   onPressed: () => context.go('/meals'),
-                  child: const Text('Plan a dinner'),
+                  child: const Text('Zaplanuj obiad'),
                 ),
               ],
             ],
@@ -306,7 +312,7 @@ class OverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('RUNNING LOW', style: AppTheme.microStyle),
+              Text('KOŃCZĄCE SIĘ ZAPASY', style: AppTheme.microStyle),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -314,7 +320,7 @@ class OverviewScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '${lowItems.length} items',
+                  '${lowItems.length} prod.',
                   style: GoogleFonts.dmMono(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
@@ -329,7 +335,7 @@ class OverviewScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24.0),
               child: Text(
-                'Everything is stocked.',
+                'Wszystko jest uzupełnione.',
                 style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
               ),
             )
@@ -378,7 +384,7 @@ class OverviewScreen extends ConsumerWidget {
           GestureDetector(
             onTap: () => context.go('/inventory'),
             child: Text(
-              'Open inventory →',
+              'Otwórz spiżarnię →',
               style: GoogleFonts.instrumentSans(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -402,7 +408,7 @@ class OverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('TODAY\'S CHORES', style: AppTheme.microStyle),
+              Text('DZISIEJSZE OBOWIĄZKI', style: AppTheme.microStyle),
               Text(
                 '$doneCount/${chores.length}',
                 style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
@@ -414,7 +420,7 @@ class OverviewScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24.0),
               child: Text(
-                'No chores assigned.',
+                'Brak przypisanych zadań.',
                 style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
               ),
             )
@@ -455,6 +461,7 @@ class OverviewScreen extends ConsumerWidget {
                       ResidentBadge(
                         name: chore.assignee,
                         color: assignedUser?.color,
+                        avatar: assignedUser?.avatar,
                       ),
                     ],
                   ),
