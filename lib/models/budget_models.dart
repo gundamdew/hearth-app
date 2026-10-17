@@ -1,5 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class SettlementInfo {
+  final String? debtorName;
+  final String? creditorName;
+  final double amount;
+  final String message;
+
+  const SettlementInfo({
+    this.debtorName,
+    this.creditorName,
+    required this.amount,
+    required this.message,
+  });
+
+  bool get isBalanced => amount < 0.5 || debtorName == null || creditorName == null;
+}
+
 class Expense {
   final String id;
   final String title;
@@ -7,6 +23,7 @@ class Expense {
   final String category;
   final DateTime date;
   final String assignee;
+  final String splitType;
 
   Expense({
     required this.id,
@@ -15,7 +32,28 @@ class Expense {
     required this.category,
     required this.date,
     required this.assignee,
+    this.splitType = 'shared',
   });
+
+  Expense copyWith({
+    String? id,
+    String? title,
+    double? amount,
+    String? category,
+    DateTime? date,
+    String? assignee,
+    String? splitType,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      amount: amount ?? this.amount,
+      category: category ?? this.category,
+      date: date ?? this.date,
+      assignee: assignee ?? this.assignee,
+      splitType: splitType ?? this.splitType,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -24,6 +62,7 @@ class Expense {
       'category': category,
       'date': Timestamp.fromDate(date),
       'assignee': assignee,
+      'splitType': splitType,
     };
   }
 
@@ -35,6 +74,7 @@ class Expense {
       category: map['category'] ?? '',
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       assignee: map['assignee'] ?? '',
+      splitType: (map['splitType'] as String?) ?? 'shared',
     );
   }
 }

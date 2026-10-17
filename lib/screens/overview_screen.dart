@@ -45,12 +45,13 @@ class OverviewScreen extends ConsumerWidget {
     final users = usersAsync.value ?? [];
 
     // Financial calculations
+    final totalMonthlyLimit = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.limit);
+    final totalSpent = budgetState.expenses
+        .where((e) => e.splitType != 'settlement')
+        .fold(0.0, (sum, exp) => sum + exp.amount);
+    final remainingBudget = totalMonthlyLimit - totalSpent;
+    final budgetProgress = totalMonthlyLimit > 0 ? (totalSpent / totalMonthlyLimit).clamp(0.0, 1.0) : 0.0;
     final totalIncome = budgetState.incomes.fold(0.0, (sum, inc) => sum + inc.amount);
-    final totalSpent = budgetState.expenses.fold(0.0, (sum, exp) => sum + exp.amount);
-    final totalLimit = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.limit);
-    final baseBudget = totalLimit > 0 ? totalLimit : totalIncome;
-    final remainingBudget = (baseBudget - totalSpent).clamp(-999999.0, 999999.0);
-    final ratio = baseBudget > 0 ? (totalSpent / baseBudget) : 0.0;
 
     // Running low items
     final lowItems = inventory.where((item) => item.isRunningLow).toList();
@@ -110,7 +111,7 @@ class OverviewScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _buildBudgetCard(context, remainingBudget, totalSpent, baseBudget, totalIncome, ratio),
+                  child: _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
                 ),
                 const SizedBox(width: 24),
                 Expanded(
@@ -132,7 +133,7 @@ class OverviewScreen extends ConsumerWidget {
               ],
             ),
           ] else ...[
-            _buildBudgetCard(context, remainingBudget, totalSpent, baseBudget, totalIncome, ratio),
+            _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
             const SizedBox(height: 16),
             _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
             const SizedBox(height: 16),
@@ -147,7 +148,7 @@ class OverviewScreen extends ConsumerWidget {
   }
 
   Widget _buildBudgetCard(BuildContext context, double remaining, double spent, double limit, double income, double ratio) {
-    final isDanger = ratio > 0.9;
+    final isDanger = ratio > 0.9 || remaining < 0;
 
     return Container(
       constraints: const BoxConstraints(minHeight: 250),
@@ -160,7 +161,7 @@ class OverviewScreen extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('DO WYDANIA W TYM MIESIĄCU', style: AppTheme.microStyle),
+              Text('LEFT TO SPEND THIS MONTH', style: AppTheme.microStyle),
               IconButton(
                 icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.muted),
                 onPressed: () => context.go('/budget'),
