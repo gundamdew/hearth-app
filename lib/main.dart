@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
 import 'widgets/hearth_ui.dart';
+import 'widgets/hearth_pulse_drawer.dart';
 import 'screens/budget_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/meals_screen.dart';
@@ -15,6 +18,7 @@ import 'screens/login_screen.dart';
 import 'providers/budget_provider.dart';
 import 'providers/meals_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/notifications_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +27,10 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
   final container = ProviderContainer();
+  await container.read(pushNotificationServiceProvider).initializeLocalNotifications();
   await container.read(budgetControllerProvider).initializeCategories();
   await container.read(mealsControllerProvider).initializeMealPlans();
 
@@ -97,6 +104,12 @@ class MainScaffold extends ConsumerWidget {
       return const LoginScreen();
     }
 
+    final notificationsAsync = ref.watch(notificationsStreamProvider);
+    final notifications = notificationsAsync.value ?? [];
+    final unreadCount = notifications
+        .where((n) => !n.readBy.contains(currentUser.name))
+        .length;
+
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = width < 600;
     final isDesktop = width >= 1024;
@@ -114,6 +127,7 @@ class MainScaffold extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.canvas,
+      endDrawer: HearthPulseDrawer(currentUser: currentUser),
       body: Container(
         decoration: AppTheme.canvasGradientDecoration,
         child: SafeArea(
@@ -197,6 +211,67 @@ class MainScaffold extends ConsumerWidget {
                           ] else ...[
                             const Spacer(),
                           ],
+
+                          // Hearth Pulse Bell Icon
+                          Builder(
+                            builder: (scaffoldContext) {
+                              return Container(
+                                margin: const EdgeInsets.only(right: 10),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppTheme.line),
+                                ),
+                                child: IconButton(
+                                  icon: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Icon(
+                                        unreadCount > 0
+                                            ? Icons.notifications_active_outlined
+                                            : Icons.notifications_none_rounded,
+                                        size: 20,
+                                        color: unreadCount > 0 ? AppTheme.moss : AppTheme.muted,
+                                      ),
+                                      if (unreadCount > 0)
+                                        Positioned(
+                                          top: -2,
+                                          right: -2,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(
+                                              color: AppTheme.danger,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 14,
+                                              minHeight: 14,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              unreadCount > 9 ? '9+' : '$unreadCount',
+                                              style: GoogleFonts.dmMono(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                height: 1,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  splashRadius: 18,
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                                  tooltip: 'Hearth Pulse',
+                                  onPressed: () {
+                                    Scaffold.of(scaffoldContext).openEndDrawer();
+                                  },
+                                ),
+                              );
+                            },
+                          ),
 
                           // Profile Pill
                           Container(

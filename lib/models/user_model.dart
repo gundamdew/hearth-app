@@ -6,6 +6,8 @@ class AppUser {
   final String pinCode;
   final Color color;
   final String? avatar;
+  final List<String> fcmTokens;
+  final bool notificationsEnabled;
 
   AppUser({
     required this.id,
@@ -13,6 +15,8 @@ class AppUser {
     required this.pinCode,
     required this.color,
     this.avatar,
+    this.fcmTokens = const [],
+    this.notificationsEnabled = true,
   });
 
   AppUser copyWith({
@@ -21,6 +25,8 @@ class AppUser {
     String? pinCode,
     Color? color,
     String? avatar,
+    List<String>? fcmTokens,
+    bool? notificationsEnabled,
   }) {
     return AppUser(
       id: id ?? this.id,
@@ -28,6 +34,8 @@ class AppUser {
       pinCode: pinCode ?? this.pinCode,
       color: color ?? this.color,
       avatar: avatar ?? this.avatar,
+      fcmTokens: fcmTokens ?? this.fcmTokens,
+      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
     );
   }
 
@@ -38,6 +46,8 @@ class AppUser {
       // ignore: deprecated_member_use
       'color': color.value,
       'avatar': avatar,
+      'fcmTokens': fcmTokens,
+      'notificationsEnabled': notificationsEnabled,
     };
   }
 
@@ -49,6 +59,8 @@ class AppUser {
       // ignore: deprecated_member_use
       color: Color(map['color'] ?? 0xFFB3C5B8),
       avatar: map['avatar'],
+      fcmTokens: List<String>.from(map['fcmTokens'] ?? const []),
+      notificationsEnabled: map['notificationsEnabled'] ?? true,
     );
   }
 }

@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../models/user_model.dart';
 import '../providers/users_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/notifications_provider.dart';
 import '../widgets/hearth_ui.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -247,6 +248,98 @@ class SettingsScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Notification Settings Card
+              const SectionHeader(
+                sub: 'Powiadomienia',
+                title: 'Powiadomienia Push',
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: AppTheme.cardDecoration,
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Push Notifications',
+                                style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Otrzymuj alerty o wydatkach, zadaniach i stanie zapasów na bieżąco.',
+                                style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch.adaptive(
+                          value: currentUser?.notificationsEnabled ?? true,
+                          activeTrackColor: AppTheme.moss,
+                          onChanged: currentUser == null
+                              ? null
+                              : (bool val) async {
+                                  final updated = currentUser.copyWith(notificationsEnabled: val);
+                                  ref.read(currentUserProvider.notifier).updateCurrentUser(updated);
+                                  await ref
+                                      .read(pushNotificationServiceProvider)
+                                      .toggleNotificationsEnabled(currentUser.id, val);
+                                  if (val) {
+                                    await ref
+                                        .read(pushNotificationServiceProvider)
+                                        .initAndRegisterUser(updated);
+                                  } else {
+                                    await ref
+                                        .read(pushNotificationServiceProvider)
+                                        .unregisterUser(updated);
+                                  }
+                                },
+                        ),
+                      ],
+                    ),
+                    const Divider(color: AppTheme.line, height: 28),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Sprawdź działanie powiadomień i szuflady Hearth Pulse',
+                            style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: currentUser == null
+                              ? null
+                              : () async {
+                                  await ref
+                                      .read(notificationControllerProvider)
+                                      .sendTestNotification(currentUser.name);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Wysłano testowe powiadomienie do Hearth Pulse!'),
+                                        backgroundColor: AppTheme.moss,
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.send_outlined, size: 16),
+                          label: const Text('Send Test Notification'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Residents Settings Card
               SectionHeader(
                 sub: 'Domownicy',
                 title: 'Ustawienia domowników',
