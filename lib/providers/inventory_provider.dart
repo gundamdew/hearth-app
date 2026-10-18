@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_item.dart';
+import 'notifications_provider.dart';
 
 final inventoryProvider = StreamProvider<List<InventoryItem>>((ref) {
   return FirebaseFirestore.instance.collection('inventory').snapshots().map(
@@ -8,10 +9,13 @@ final inventoryProvider = StreamProvider<List<InventoryItem>>((ref) {
   );
 });
 
-final inventoryControllerProvider = Provider((ref) => InventoryController());
+final inventoryControllerProvider = Provider((ref) => InventoryController(ref));
 
 class InventoryController {
+  final Ref _ref;
   final _db = FirebaseFirestore.instance;
+
+  InventoryController(this._ref);
 
   Future<void> addItem(String name, String location, int quantity, String unit, int threshold) async {
     final item = InventoryItem(
@@ -25,9 +29,33 @@ class InventoryController {
     await _db.collection('inventory').add(item.toMap());
   }
 
-  Future<void> updateQuantity(String id, int currentQty, int delta) async {
+  Future<void> updateQuantity(
+    String id,
+    int currentQty,
+    int delta, {
+    InventoryItem? item,
+    String? actorName,
+  }) async {
     final newQty = (currentQty + delta).clamp(0, 999);
     await _db.collection('inventory').doc(id).update({'quantity': newQty});
+
+    InventoryItem? target = item;
+    if (target == null) {
+      final doc = await _db.collection('inventory').doc(id).get();
+      final data = doc.data();
+      if (data != null) {
+        target = InventoryItem.fromFirestore(data, doc.id);
+      }
+    }
+
+    if (target != null && delta < 0 && newQty <= target.lowStockThreshold) {
+      await _ref.read(notificationControllerProvider).dispatchNotification(
+        title: 'Running Low: ${target.name}',
+        body: 'Only $newQty ${target.unit} left in ${target.location}.',
+        category: 'inventory',
+        actorName: actorName ?? 'Inventory',
+      );
+    }
   }
 
   Future<void> removeItem(String id) async {

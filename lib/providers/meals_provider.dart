@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../models/meal_models.dart';
+import 'inventory_provider.dart';
+import 'notifications_provider.dart';
 
 final recipesProvider = StreamProvider<List<Recipe>>((ref) {
   return FirebaseFirestore.instance.collection('recipes').snapshots().map(
@@ -66,19 +68,35 @@ class MealsController {
     await _db.collection('meal_plans').doc(mealPlanId).update({'recipeId': null, 'isCooked': false});
   }
 
-  Future<void> markCooked(String mealPlanId, String recipeId) async {
+  Future<void> markCooked(String mealPlanId, String recipeId, {String? actorName}) async {
     final recipesVal = _ref.read(recipesProvider).value ?? [];
     final matches = recipesVal.where((r) => r.id == recipeId);
-    if (matches.isEmpty) return;
+    if (matches.isEmpty) {
+      return;
+    }
     
     final recipe = matches.first;
     final batch = _db.batch();
+    final inventoryVal = _ref.read(inventoryProvider).value ?? [];
 
     for (var ingredient in recipe.ingredients) {
       if (ingredient.inventoryId.isNotEmpty) {
         batch.update(_db.collection('inventory').doc(ingredient.inventoryId), {
           'quantity': FieldValue.increment(-ingredient.quantity)
         });
+
+        final invItem = inventoryVal.where((i) => i.id == ingredient.inventoryId).firstOrNull;
+        if (invItem != null) {
+          final newQty = (invItem.quantity - ingredient.quantity).clamp(0, 999);
+          if (newQty <= invItem.lowStockThreshold) {
+            await _ref.read(notificationControllerProvider).dispatchNotification(
+              title: 'Running Low: ${invItem.name}',
+              body: 'Only $newQty ${invItem.unit} left in ${invItem.location}.',
+              category: 'inventory',
+              actorName: actorName ?? 'Kitchen',
+            );
+          }
+        }
       }
     }
 

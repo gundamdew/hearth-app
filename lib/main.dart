@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
@@ -15,8 +14,11 @@ import 'screens/cleaning_screen.dart';
 import 'screens/overview_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/login_screen.dart';
+import 'models/meal_models.dart';
 import 'providers/budget_provider.dart';
 import 'providers/meals_provider.dart';
+import 'providers/cleaning_provider.dart';
+import 'providers/inventory_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notifications_provider.dart';
 
@@ -26,8 +28,6 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   final container = ProviderContainer();
   await container.read(pushNotificationServiceProvider).initializeLocalNotifications();
@@ -109,6 +109,34 @@ class MainScaffold extends ConsumerWidget {
     final unreadCount = notifications
         .where((n) => !n.readBy.contains(currentUser.name))
         .length;
+
+    final mealPlans = ref.watch(mealPlanProvider).value ?? [];
+    final recipes = ref.watch(recipesProvider).value ?? [];
+    final chores = ref.watch(cleaningProvider).value ?? [];
+    final inventory = ref.watch(inventoryProvider).value ?? [];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (currentUser.notificationsEnabled) {
+        final now = DateTime.now();
+        final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+        final todayPlan = mealPlans.where((p) => p.id == todayStr).firstOrNull;
+        final Recipe? todaysRecipe = todayPlan?.recipeId != null
+            ? recipes.where((r) => r.id == todayPlan!.recipeId).firstOrNull
+            : null;
+
+        final myChoresCount = chores
+            .where((c) => !c.isDone && c.assignee.toLowerCase() == currentUser.name.toLowerCase())
+            .length;
+
+        final lowStock = inventory.where((i) => i.isRunningLow).toList();
+
+        ref.read(pushNotificationServiceProvider).syncScheduledDeviceNotifications(
+          todaysRecipe: todaysRecipe,
+          choresCount: myChoresCount,
+          lowStockItems: lowStock,
+        );
+      }
+    });
 
     final width = MediaQuery.sizeOf(context).width;
     final isMobile = width < 600;

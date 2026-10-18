@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/budget_models.dart';
 import '../models/user_model.dart';
+import 'notifications_provider.dart';
 
 class SelectedMonthNotifier extends Notifier<DateTime> {
   @override
@@ -108,10 +109,13 @@ final budgetStateProvider = Provider<AsyncValue<BudgetState>>((ref) {
   ));
 });
 
-final budgetControllerProvider = Provider((ref) => BudgetController());
+final budgetControllerProvider = Provider((ref) => BudgetController(ref));
 
 class BudgetController {
+  final Ref _ref;
   final _db = FirebaseFirestore.instance;
+
+  BudgetController(this._ref);
 
   Future<void> initializeCategories() async {
     final snap = await _db.collection('budget_categories').limit(1).get();
@@ -149,6 +153,16 @@ class BudgetController {
       'assignee': assignee,
       'splitType': splitType,
     });
+
+    if (splitType == 'shared') {
+      final formattedAmount = amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2);
+      await _ref.read(notificationControllerProvider).dispatchNotification(
+        title: 'New Shared Expense',
+        body: '$assignee added $title ($formattedAmount USD) in $categoryName.',
+        category: 'budget',
+        actorName: assignee,
+      );
+    }
   }
 
   Future<void> addIncome(String title, double amount, String assignee) async {
@@ -190,6 +204,14 @@ class BudgetController {
       'amount': amount,
       'date': Timestamp.now(),
     });
+
+    final formattedAmount = amount.toStringAsFixed(amount.truncateToDouble() == amount ? 0 : 2);
+    await _ref.read(notificationControllerProvider).dispatchNotification(
+      title: 'Balance Settled',
+      body: '$debtorName settled up the balance ($formattedAmount USD).',
+      category: 'budget',
+      actorName: debtorName,
+    );
   }
 }
 
