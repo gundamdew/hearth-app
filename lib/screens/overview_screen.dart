@@ -31,10 +31,11 @@ class OverviewScreen extends ConsumerWidget {
     final usersAsync = ref.watch(usersProvider);
     final currentUser = ref.watch(currentUserProvider);
 
-    if (budgetAsync.isLoading || inventoryAsync.isLoading || mealPlanAsync.isLoading || 
-        recipesAsync.isLoading || choresAsync.isLoading || usersAsync.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.moss));
-    }
+    final isBudgetLoading = budgetAsync.isLoading && budgetAsync.value == null;
+    final isDinnerLoading = (mealPlanAsync.isLoading && mealPlanAsync.value == null) ||
+        (recipesAsync.isLoading && recipesAsync.value == null);
+    final isInventoryLoading = inventoryAsync.isLoading && inventoryAsync.value == null;
+    final isChoresLoading = choresAsync.isLoading && choresAsync.value == null;
 
     final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
     final inventory = inventoryAsync.value ?? [];
@@ -105,11 +106,15 @@ class OverviewScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
+                  child: isBudgetLoading
+                      ? _buildCardSkeleton(title: 'LEFT TO SPEND THIS MONTH', icon: Icons.account_balance_wallet_outlined)
+                      : _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
                 ),
                 const SizedBox(width: 24),
                 Expanded(
-                  child: _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
+                  child: isDinnerLoading
+                      ? _buildCardSkeleton(title: 'DZISIEJSZY OBIAD · DZIŚ')
+                      : _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
                 ),
               ],
             ),
@@ -118,22 +123,38 @@ class OverviewScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: _buildInventoryCard(context, lowItems),
+                  child: isInventoryLoading
+                      ? _buildCardSkeleton(title: 'KOŃCZĄCE SIĘ ZAPASY')
+                      : _buildInventoryCard(context, lowItems),
                 ),
                 const SizedBox(width: 24),
                 Expanded(
-                  child: _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
+                  child: isChoresLoading
+                      ? _buildCardSkeleton(title: 'DZISIEJSZE OBOWIĄZKI')
+                      : _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
                 ),
               ],
             ),
           ] else ...[
-            _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
+            if (isBudgetLoading)
+              _buildCardSkeleton(title: 'LEFT TO SPEND THIS MONTH', icon: Icons.account_balance_wallet_outlined)
+            else
+              _buildBudgetCard(context, remainingBudget, totalSpent, totalMonthlyLimit, totalIncome, budgetProgress),
             const SizedBox(height: 16),
-            _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
+            if (isDinnerLoading)
+              _buildCardSkeleton(title: 'DZISIEJSZY OBIAD · DZIŚ')
+            else
+              _buildDinnerCard(context, ref, todaysPlan, todaysRecipe, plannedDinnersCount),
             const SizedBox(height: 16),
-            _buildInventoryCard(context, lowItems),
+            if (isInventoryLoading)
+              _buildCardSkeleton(title: 'KOŃCZĄCE SIĘ ZAPASY')
+            else
+              _buildInventoryCard(context, lowItems),
             const SizedBox(height: 16),
-            _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
+            if (isChoresLoading)
+              _buildCardSkeleton(title: 'DZISIEJSZE OBOWIĄZKI')
+            else
+              _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
           ],
           const SizedBox(height: 40),
         ],
@@ -141,66 +162,124 @@ class OverviewScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildCardSkeleton({required String title, IconData? icon}) {
+    return RepaintBoundary(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 250),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(title, style: AppTheme.microStyle),
+                if (icon != null)
+                  Icon(icon, size: 18, color: AppTheme.muted.withValues(alpha: 0.5)),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 140,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppTheme.stone.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: 200,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: AppTheme.line,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              height: 6,
+              decoration: BoxDecoration(
+                color: AppTheme.stone.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBudgetCard(BuildContext context, double remaining, double spent, double limit, double income, double ratio) {
     final isDanger = ratio > 0.9 || remaining < 0;
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 250),
-      decoration: AppTheme.cardDecoration,
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('LEFT TO SPEND THIS MONTH', style: AppTheme.microStyle),
-              IconButton(
-                icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.muted),
-                onPressed: () => context.go('/budget'),
-                splashRadius: 18,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} zł',
-            style: AppTheme.monoHuge.copyWith(
-              color: isDanger ? AppTheme.danger : AppTheme.ink,
+    return RepaintBoundary(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 250),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('LEFT TO SPEND THIS MONTH', style: AppTheme.microStyle),
+                IconButton(
+                  icon: const Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppTheme.muted),
+                  onPressed: () => context.go('/budget'),
+                  splashRadius: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 24),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              HearthProgressBar(value: ratio),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${spent.round()} zł wydano',
-                    style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-                  ),
-                  Text(
-                    '${(ratio * 100).round()}% z ${limit.round()} zł',
-                    style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-                  ),
-                ],
+            const SizedBox(height: 16),
+            Text(
+              '${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} zł',
+              style: AppTheme.monoHuge.copyWith(
+                color: isDanger ? AppTheme.danger : AppTheme.ink,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Zarejestrowany przychód · ${income.round()} zł',
-                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-              ),
-            ],
-          ),
-        ],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 24),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                HearthProgressBar(value: ratio),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${spent.round()} zł wydano',
+                      style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
+                    ),
+                    Text(
+                      '${(ratio * 100).round()}% z ${limit.round()} zł',
+                      style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Zarejestrowany przychód · ${income.round()} zł',
+                  style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -208,254 +287,260 @@ class OverviewScreen extends ConsumerWidget {
   Widget _buildDinnerCard(BuildContext context, WidgetRef ref, MealPlan plan, Recipe? recipe, int plannedCount) {
     final hasRecipe = recipe != null;
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 250),
-      decoration: AppTheme.cardDecoration,
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('DZISIEJSZY OBIAD · DZIŚ', style: AppTheme.microStyle),
-              Text(
-                '$plannedCount z 14 zaplanowanych',
-                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (hasRecipe) ...[
-            Text(
-              recipe.name,
-              style: AppTheme.titleStyle(fontSize: 30),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
-              style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-            ),
-          ] else ...[
-            Text(
-              'Brak planów na dzisiaj',
-              style: AppTheme.titleStyle(fontSize: 26, color: AppTheme.muted, fontStyle: FontStyle.italic),
-            ),
-          ],
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (hasRecipe) ...[
-                if (plan.isCooked)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.sage.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check, size: 16, color: AppTheme.moss),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Ugotowane',
-                          style: AppTheme.sansMedium.copyWith(
-                            color: AppTheme.moss,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ElevatedButton(
-                    onPressed: () {
-                      ref.read(mealsControllerProvider).markCooked(plan.id, recipe.id);
-                    },
-                    child: const Text('Oznacz jako ugotowane'),
-                  ),
-              ] else ...[
-                OutlinedButton(
-                  onPressed: () => context.go('/meals'),
-                  child: const Text('Zaplanuj obiad'),
+    return RepaintBoundary(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 250),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('DZISIEJSZY OBIAD · DZIŚ', style: AppTheme.microStyle),
+                Text(
+                  '$plannedCount z 14 zaplanowanych',
+                  style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            if (hasRecipe) ...[
+              Text(
+                recipe.name,
+                style: AppTheme.titleStyle(fontSize: 30),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
+                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
+              ),
+            ] else ...[
+              Text(
+                'Brak planów na dzisiaj',
+                style: AppTheme.titleStyle(fontSize: 26, color: AppTheme.muted, fontStyle: FontStyle.italic),
+              ),
             ],
-          ),
-        ],
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (hasRecipe) ...[
+                  if (plan.isCooked)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.sage.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check, size: 16, color: AppTheme.moss),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Ugotowane',
+                            style: AppTheme.sansMedium.copyWith(
+                              color: AppTheme.moss,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(mealsControllerProvider).markCooked(plan.id, recipe.id);
+                      },
+                      child: const Text('Oznacz jako ugotowane'),
+                    ),
+                ] else ...[
+                  OutlinedButton(
+                    onPressed: () => context.go('/meals'),
+                    child: const Text('Zaplanuj obiad'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInventoryCard(BuildContext context, List<dynamic> lowItems) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 250),
-      decoration: AppTheme.cardDecoration,
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('KOŃCZĄCE SIĘ ZAPASY', style: AppTheme.microStyle),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.danger.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(999),
+    return RepaintBoundary(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 250),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('KOŃCZĄCE SIĘ ZAPASY', style: AppTheme.microStyle),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.danger.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${lowItems.length} prod.',
+                    style: AppTheme.monoSmall.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.danger,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (lowItems.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
                 child: Text(
-                  '${lowItems.length} prod.',
-                  style: AppTheme.monoSmall.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.danger,
-                  ),
+                  'Wszystko jest uzupełnione.',
+                  style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: lowItems.take(5).length,
+                separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                itemBuilder: (context, index) {
+                  final item = lowItems[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppTheme.danger,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: AppTheme.sansMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${item.quantity} ${item.unit}',
+                          style: AppTheme.monoSmall.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.danger,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => context.go('/inventory'),
+              child: Text(
+                'Otwórz spiżarnię →',
+                style: AppTheme.sansMedium.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.moss,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (lowItems.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0),
-              child: Text(
-                'Wszystko jest uzupełnione.',
-                style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: lowItems.take(5).length,
-              separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
-              itemBuilder: (context, index) {
-                final item = lowItems[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.danger,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          item.name,
-                          style: AppTheme.sansMedium,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        '${item.quantity} ${item.unit}',
-                        style: AppTheme.monoSmall.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: AppTheme.danger,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
             ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () => context.go('/inventory'),
-            child: Text(
-              'Otwórz spiżarnię →',
-              style: AppTheme.sansMedium.copyWith(
-                fontWeight: FontWeight.w500,
-                color: AppTheme.moss,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildChoresCard(BuildContext context, WidgetRef ref, List<dynamic> chores, Map<String, dynamic> usersByNameMap, int doneCount) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 250),
-      decoration: AppTheme.cardDecoration,
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('DZISIEJSZE OBOWIĄZKI', style: AppTheme.microStyle),
-              Text(
-                '$doneCount/${chores.length}',
-                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (chores.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24.0),
-              child: Text(
-                'Brak przypisanych zadań.',
-                style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
-              ),
-            )
-          else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: chores.take(5).length,
-              separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
-              itemBuilder: (context, index) {
-                final chore = chores[index];
-                final assignedUser = usersByNameMap[chore.assignee];
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      HearthCheckbox(
-                        checked: chore.isDone,
-                        onChange: () {
-                          ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          chore.name,
-                          style: AppTheme.sansMedium.copyWith(
-                            color: chore.isDone ? AppTheme.muted : AppTheme.ink,
-                            decoration: chore.isDone ? TextDecoration.lineThrough : null,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      ResidentBadge(
-                        name: chore.assignee,
-                        color: assignedUser?.color,
-                        avatar: assignedUser?.avatar,
-                      ),
-                    ],
-                  ),
-                );
-              },
+    return RepaintBoundary(
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 250),
+        decoration: AppTheme.cardDecoration,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('DZISIEJSZE OBOWIĄZKI', style: AppTheme.microStyle),
+                Text(
+                  '$doneCount/${chores.length}',
+                  style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
+                ),
+              ],
             ),
-        ],
+            const SizedBox(height: 16),
+            if (chores.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24.0),
+                child: Text(
+                  'Brak przypisanych zadań.',
+                  style: AppTheme.titleStyle(fontSize: 20, color: AppTheme.muted, fontStyle: FontStyle.italic),
+                ),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: chores.take(5).length,
+                separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
+                itemBuilder: (context, index) {
+                  final chore = chores[index];
+                  final assignedUser = usersByNameMap[chore.assignee];
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        HearthCheckbox(
+                          checked: chore.isDone,
+                          onChange: () {
+                            ref.read(cleaningControllerProvider).toggleStatus(chore.id, chore.isDone);
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            chore.name,
+                            style: AppTheme.sansMedium.copyWith(
+                              color: chore.isDone ? AppTheme.muted : AppTheme.ink,
+                              decoration: chore.isDone ? TextDecoration.lineThrough : null,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ResidentBadge(
+                          name: chore.assignee,
+                          color: assignedUser?.color,
+                          avatar: assignedUser?.avatar,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

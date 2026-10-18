@@ -63,4 +63,30 @@ class AppUser {
       notificationsEnabled: map['notificationsEnabled'] ?? true,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'pinCode': pinCode,
+      // ignore: deprecated_member_use
+      'color': color.value,
+      'avatar': avatar,
+      'fcmTokens': fcmTokens,
+      'notificationsEnabled': notificationsEnabled,
+    };
+  }
+
+  factory AppUser.fromJson(Map<String, dynamic> json) {
+    return AppUser(
+      id: json['id'] ?? '',
+      name: json['name'] ?? 'Nieznany',
+      pinCode: json['pinCode'] ?? '0000',
+      // ignore: deprecated_member_use
+      color: Color(json['color'] ?? 0xFFB3C5B8),
+      avatar: json['avatar'],
+      fcmTokens: List<String>.from(json['fcmTokens'] ?? const []),
+      notificationsEnabled: json['notificationsEnabled'] ?? true,
+    );
+  }
 }

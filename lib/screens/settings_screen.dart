@@ -417,6 +417,20 @@ class SettingsScreen extends ConsumerWidget {
                   },
                 ),
               ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    ref.read(currentUserProvider.notifier).logout();
+                  },
+                  icon: const Icon(Icons.swap_horiz, size: 18),
+                  label: const Text('Zmień profil / Wyloguj (Switch Resident)'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
               const SizedBox(height: 48),
             ],
           ),

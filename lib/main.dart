@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
@@ -20,18 +22,22 @@ import 'providers/cleaning_provider.dart';
 import 'providers/inventory_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/notifications_provider.dart';
+import 'providers/users_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = true;
   
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
   final container = ProviderContainer();
-  await container.read(pushNotificationServiceProvider).initializeLocalNotifications();
-  await container.read(budgetControllerProvider).initializeCategories();
-  await container.read(mealsControllerProvider).initializeMealPlans();
 
   runApp(
     UncontrolledProviderScope(
@@ -58,8 +64,23 @@ final _router = GoRouter(
   ],
 );
 
-class HearthApp extends StatelessWidget {
+class HearthApp extends ConsumerStatefulWidget {
   const HearthApp({super.key});
+
+  @override
+  ConsumerState<HearthApp> createState() => _HearthAppState();
+}
+
+class _HearthAppState extends ConsumerState<HearthApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(pushNotificationServiceProvider).initializeLocalNotifications();
+      ref.read(budgetControllerProvider).initializeCategories();
+      ref.read(mealsControllerProvider).initializeMealPlans();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,10 +119,23 @@ class MainScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(currentUserProvider);
+    final isSessionRestoring = ref.watch(isSessionRestoringProvider);
 
     if (currentUser == null) {
+      if (isSessionRestoring) {
+        return const Scaffold(
+          backgroundColor: AppTheme.canvas,
+          body: Center(
+            child: CircularProgressIndicator(color: AppTheme.moss, strokeWidth: 2),
+          ),
+        );
+      }
       return const LoginScreen();
     }
+
+    // Pre-warm data streams for instant 0ms tab navigation
+    ref.watch(budgetStateProvider);
+    ref.watch(usersProvider);
 
     final unreadCount = ref.watch(notificationsStreamProvider.select((asyncList) {
       final list = asyncList.value;
