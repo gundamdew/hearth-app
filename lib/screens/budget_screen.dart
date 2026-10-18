@@ -1,14 +1,12 @@
 // lib/screens/budget_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/budget_models.dart';
 import '../models/user_model.dart';
 import '../providers/budget_provider.dart';
 import '../providers/users_provider.dart';
-import '../providers/auth_provider.dart';
 import '../widgets/hearth_ui.dart';
 
 class BudgetScreen extends ConsumerStatefulWidget {
@@ -19,45 +17,6 @@ class BudgetScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetScreenState extends ConsumerState<BudgetScreen> {
-  final TextEditingController _descCtrl = TextEditingController();
-  final TextEditingController _amountCtrl = TextEditingController();
-  String _selectedType = 'Wydatek';
-  String _selectedSplitType = 'shared';
-  String? _selectedCategory;
-  String? _selectedAssignee;
-
-  @override
-  void dispose() {
-    _descCtrl.dispose();
-    _amountCtrl.dispose();
-    super.dispose();
-  }
-
-  void _submitTransaction(List<BudgetCategory> categories, List<AppUser> users) {
-    final title = _descCtrl.text.trim();
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0.0;
-    final assignee = _selectedAssignee ?? (users.isNotEmpty ? users.first.name : '');
-
-    if (title.isNotEmpty && amount > 0 && assignee.isNotEmpty) {
-      if (_selectedType == 'Wydatek' || _selectedType == 'Expense') {
-        final cat = _selectedCategory ?? (categories.isNotEmpty ? categories.first.name : 'Ogólne');
-        ref.read(budgetControllerProvider).addExpense(
-          title,
-          amount,
-          cat,
-          assignee,
-          splitType: _selectedSplitType,
-        );
-      } else {
-        ref.read(budgetControllerProvider).addIncome(title, amount, assignee);
-      }
-
-      _descCtrl.clear();
-      _amountCtrl.clear();
-      _selectedSplitType = 'shared';
-      FocusScope.of(context).unfocus();
-    }
-  }
 
   void _showAddCategoryDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
@@ -72,7 +31,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         children: [
           Text(
             'Nazwa kategorii',
-            style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
+            style: AppTheme.sansLabel,
           ),
           const SizedBox(height: 6),
           TextField(
@@ -83,13 +42,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
           const SizedBox(height: 16),
           Text(
             'Miesięczny limit (zł)',
-            style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
+            style: AppTheme.sansLabel,
           ),
           const SizedBox(height: 6),
           TextField(
             controller: limitCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: GoogleFonts.dmMono(fontSize: 14),
+            style: AppTheme.monoMedium,
             decoration: const InputDecoration(hintText: '0'),
           ),
           const SizedBox(height: 24),
@@ -124,13 +83,13 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         children: [
           Text(
             'Ustaw miesięczny limit dla kategorii ${cat.name} (w zł):',
-            style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
+            style: AppTheme.sansMedium.copyWith(color: AppTheme.muted),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: ctrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: GoogleFonts.dmMono(fontSize: 14),
+            style: AppTheme.monoMedium,
             autofocus: true,
             decoration: const InputDecoration(hintText: 'np. 500'),
           ),
@@ -177,7 +136,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             const SizedBox(height: 12),
             Text(
               'Nie można usunąć jedynej kategorii.',
-              style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+              style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
             ),
           ],
         ],
@@ -199,12 +158,12 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
         children: [
           Text(
             'Record settlement of $amount USD from $debtor to $creditor?',
-            style: GoogleFonts.instrumentSans(fontSize: 16, color: AppTheme.ink),
+            style: AppTheme.sansHeader,
           ),
           const SizedBox(height: 8),
           Text(
             'Zapisze to transakcję rozliczenia i wyzeruje bieżący stan zadłużenia.',
-            style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+            style: AppTheme.sansMedium.copyWith(fontSize: 13, color: AppTheme.muted),
           ),
           const SizedBox(height: 24),
           Row(
@@ -253,7 +212,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       ),
       child: Text(
         label,
-        style: GoogleFonts.instrumentSans(
+        style: AppTheme.sansTiny.copyWith(
           fontSize: 10,
           fontWeight: FontWeight.w600,
           color: color,
@@ -269,7 +228,6 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
 
     final budgetAsync = ref.watch(budgetStateProvider);
     final usersAsync = ref.watch(usersProvider);
-    final currentUser = ref.watch(currentUserProvider);
     final selectedMonth = ref.watch(selectedMonthProvider);
 
     if (budgetAsync.isLoading || usersAsync.isLoading) {
@@ -279,15 +237,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
     final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
     final users = usersAsync.value ?? [];
 
-    if (_selectedAssignee == null && currentUser != null) {
-      _selectedAssignee = currentUser.name;
-    } else if (_selectedAssignee == null && users.isNotEmpty) {
-      _selectedAssignee = users.first.name;
-    }
 
-    if (_selectedCategory == null && budgetState.categories.isNotEmpty) {
-      _selectedCategory = budgetState.categories.first.name;
-    }
 
     // Settlement calculations
     final settlement = calculateDebt(budgetState.expenses, users);
@@ -364,7 +314,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               child: Text(
                 monthLabel,
-                style: GoogleFonts.dmMono(
+                style: AppTheme.monoSmall.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.ink,
@@ -433,11 +383,11 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                               children: [
                                 Text(
                                   'Wpływy: ${flow.income.round()} zł',
-                                  style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.moss),
+                                  style: AppTheme.monoSmall.copyWith(color: AppTheme.moss),
                                 ),
                                 Text(
                                   'Wydatki: ${flow.out.round()} zł',
-                                  style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                                  style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                                 ),
                               ],
                             ),
@@ -468,7 +418,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   icon: const Icon(Icons.add, size: 16, color: AppTheme.moss),
                   label: Text(
                     '+ Add category',
-                    style: GoogleFonts.instrumentSans(
+                    style: AppTheme.sansMedium.copyWith(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.moss,
@@ -487,7 +437,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
                     'Brak kategorii. Dodaj pierwszą kategorię!',
-                    style: GoogleFonts.instrumentSans(color: AppTheme.muted),
+                    style: AppTheme.sansMedium.copyWith(color: AppTheme.muted),
                   ),
                 )
               else
@@ -519,8 +469,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                 ),
                                 Text(
                                   '${cat.currentSpent.round()} / ${cat.limit.round()} zł',
-                                  style: GoogleFonts.dmMono(
-                                    fontSize: 12,
+                                  style: AppTheme.monoSmall.copyWith(
                                     color: isOverBudget ? AppTheme.red : AppTheme.muted,
                                     fontWeight: isOverBudget ? FontWeight.w600 : FontWeight.w400,
                                   ),
@@ -557,106 +506,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Transaction Form
-        FormCard(
-          sub: 'Nowy wpis',
-          title: 'Zarejestruj transakcję',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              HearthSegmented<String>(
-                value: _selectedType,
-                options: const ['Wydatek', 'Przychód'],
-                onChanged: (val) => setState(() => _selectedType = val),
-                labelBuilder: (s) => s,
-              ),
-              const SizedBox(height: 16),
-              if (_selectedType == 'Wydatek' || _selectedType == 'Expense') ...[
-                Text(
-                  'Typ podziału',
-                  style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
-                ),
-                const SizedBox(height: 6),
-                HearthSegmented<String>(
-                  value: _selectedSplitType,
-                  options: const ['shared', 'personal'],
-                  onChanged: (val) => setState(() => _selectedSplitType = val),
-                  labelBuilder: (s) => s == 'shared' ? 'Shared (50/50)' : 'Personal',
-                ),
-                const SizedBox(height: 16),
-              ],
-              Text('Opis', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(hintText: 'np. Zakupy w Biedronce'),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Kto płacił', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                        const SizedBox(height: 6),
-                        HearthSelect<String>(
-                          value: _selectedAssignee ?? '',
-                          items: users.map((u) => u.name).toList(),
-                          onChanged: (val) {
-                            if (val != null) {
-                              setState(() => _selectedAssignee = val);
-                            }
-                          },
-                          labelBuilder: (name) => name,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Kwota (zł)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _amountCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: GoogleFonts.dmMono(fontSize: 14),
-                          decoration: const InputDecoration(hintText: '0.00'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (_selectedType == 'Wydatek' || _selectedType == 'Expense') ...[
-                const SizedBox(height: 16),
-                Text('Kategoria', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                const SizedBox(height: 6),
-                HearthSelect<String>(
-                  value: _selectedCategory ?? '',
-                  items: budgetState.categories.map((c) => c.name).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() => _selectedCategory = val);
-                    }
-                  },
-                  labelBuilder: (name) => name,
-                ),
-              ],
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => _submitTransaction(budgetState.categories, users),
-                  child: Text(_selectedType == 'Wydatek' ? 'Dodaj wydatek' : 'Dodaj przychód'),
-                ),
-              ),
-            ],
-          ),
-        ),
+        _BudgetTransactionFormCard(categories: budgetState.categories, users: users),
         const SizedBox(height: 24),
 
         // Recent Transactions Section
@@ -685,8 +535,10 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                     final isInc = tx.type == 'Income';
                     final sign = isInc ? '+' : '−';
 
-                    return Dismissible(
-                      key: Key(tx.id),
+                    return RepaintBoundary(
+                      key: ValueKey(tx.id),
+                      child: Dismissible(
+                        key: Key(tx.id),
                       direction: DismissDirection.endToStart,
                       background: Container(
                         color: AppTheme.danger,
@@ -736,7 +588,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                                   const SizedBox(height: 2),
                                   Text(
                                     '${tx.assignee} · ${tx.category}',
-                                    style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                    style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
@@ -745,8 +597,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                             const SizedBox(width: 12),
                             Text(
                               '$sign${tx.amount.round()} zł',
-                              style: GoogleFonts.dmMono(
-                                fontSize: 14,
+                              style: AppTheme.monoMedium.copyWith(
                                 fontWeight: FontWeight.w500,
                                 color: isInc ? AppTheme.moss : AppTheme.ink,
                               ),
@@ -754,6 +605,7 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
                           ],
                         ),
                       ),
+                    ),
                     );
                   },
                 ),
@@ -834,6 +686,172 @@ class _BudgetScreenState extends ConsumerState<BudgetScreen> {
             rightPanel,
           ],
           const SizedBox(height: 48),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetTransactionFormCard extends ConsumerStatefulWidget {
+  final List<BudgetCategory> categories;
+  final List<AppUser> users;
+
+  const _BudgetTransactionFormCard({
+    required this.categories,
+    required this.users,
+  });
+
+  @override
+  ConsumerState<_BudgetTransactionFormCard> createState() => _BudgetTransactionFormCardState();
+}
+
+class _BudgetTransactionFormCardState extends ConsumerState<_BudgetTransactionFormCard> {
+  final TextEditingController _descCtrl = TextEditingController();
+  final TextEditingController _amountCtrl = TextEditingController();
+  String _selectedType = 'Wydatek';
+  String _selectedSplitType = 'shared';
+  String? _selectedCategory;
+  String? _selectedAssignee;
+
+  @override
+  void dispose() {
+    _descCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submitTransaction() {
+    final title = _descCtrl.text.trim();
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0.0;
+    final assignee = _selectedAssignee ?? (widget.users.isNotEmpty ? widget.users.first.name : '');
+
+    if (title.isNotEmpty && amount > 0 && assignee.isNotEmpty) {
+      if (_selectedType == 'Wydatek' || _selectedType == 'Expense') {
+        final cat = _selectedCategory ?? (widget.categories.isNotEmpty ? widget.categories.first.name : 'Ogólne');
+        ref.read(budgetControllerProvider).addExpense(
+          title,
+          amount,
+          cat,
+          assignee,
+          splitType: _selectedSplitType,
+        );
+      } else {
+        ref.read(budgetControllerProvider).addIncome(title, amount, assignee);
+      }
+
+      _descCtrl.clear();
+      _amountCtrl.clear();
+      _selectedSplitType = 'shared';
+      FocusScope.of(context).unfocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_selectedAssignee == null && widget.users.isNotEmpty) {
+      _selectedAssignee = widget.users.first.name;
+    }
+    if (_selectedCategory == null && widget.categories.isNotEmpty) {
+      _selectedCategory = widget.categories.first.name;
+    }
+
+    return FormCard(
+      sub: 'Nowy wpis',
+      title: 'Zarejestruj transakcję',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HearthSegmented<String>(
+            value: _selectedType,
+            options: const ['Wydatek', 'Przychód'],
+            onChanged: (val) => setState(() => _selectedType = val),
+            labelBuilder: (s) => s,
+          ),
+          const SizedBox(height: 16),
+          if (_selectedType == 'Wydatek' || _selectedType == 'Expense') ...[
+            Text(
+              'Typ podziału',
+              style: AppTheme.sansLabel,
+            ),
+            const SizedBox(height: 6),
+            HearthSegmented<String>(
+              value: _selectedSplitType,
+              options: const ['shared', 'personal'],
+              onChanged: (val) => setState(() => _selectedSplitType = val),
+              labelBuilder: (s) => s == 'shared' ? 'Shared (50/50)' : 'Personal',
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text('Opis', style: AppTheme.sansLabel),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _descCtrl,
+            decoration: const InputDecoration(hintText: 'np. Zakupy w Biedronce'),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Kto płacił', style: AppTheme.sansLabel),
+                    const SizedBox(height: 6),
+                    HearthSelect<String>(
+                      value: _selectedAssignee ?? '',
+                      items: widget.users.map((u) => u.name).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _selectedAssignee = val);
+                        }
+                      },
+                      labelBuilder: (name) => name,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Kwota (zł)', style: AppTheme.sansLabel),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _amountCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: AppTheme.monoMedium,
+                      decoration: const InputDecoration(hintText: '0.00'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_selectedType == 'Wydatek' || _selectedType == 'Expense') ...[
+            const SizedBox(height: 16),
+            Text('Kategoria', style: AppTheme.sansLabel),
+            const SizedBox(height: 6),
+            HearthSelect<String>(
+              value: _selectedCategory ?? '',
+              items: widget.categories.map((c) => c.name).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() => _selectedCategory = val);
+                }
+              },
+              labelBuilder: (name) => name,
+            ),
+          ],
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton(
+              onPressed: _submitTransaction,
+              child: Text(_selectedType == 'Wydatek' ? 'Dodaj wydatek' : 'Dodaj przychód'),
+            ),
+          ),
         ],
       ),
     );

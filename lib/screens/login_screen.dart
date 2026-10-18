@@ -1,7 +1,6 @@
 // lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/user_model.dart';
 import '../providers/users_provider.dart';
@@ -173,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
             const SizedBox(height: 8),
             Text(
               'Baza danych jest pusta. Dodaj pierwszego domownika, aby rozpocząć — kolejnych dodasz w Ustawieniach.',
-              style: GoogleFonts.instrumentSans(color: AppTheme.muted, fontSize: 14),
+              style: AppTheme.sansMedium.copyWith(color: AppTheme.muted),
             ),
             const SizedBox(height: 20),
             TextField(
@@ -251,7 +250,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         const SizedBox(width: 4),
                         Text(
                           'Chronione PIN-em',
-                          style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                          style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                         ),
                       ],
                     ),
@@ -278,7 +277,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
         const SizedBox(height: 16),
         Text('Wprowadź PIN dla: ${user.name}', style: AppTheme.titleStyle(fontSize: 28)),
         const SizedBox(height: 4),
-        Text('Domyślny PIN · 1234', style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted)),
+        Text('Domyślny PIN · 1234', style: AppTheme.monoSmall.copyWith(color: AppTheme.muted)),
         const SizedBox(height: 32),
 
         // Dots
@@ -362,12 +361,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
         child: Text(
           key,
           style: isAction
-              ? GoogleFonts.instrumentSans(
-                  fontSize: 14,
+              ? AppTheme.sansMedium.copyWith(
                   fontWeight: FontWeight.w500,
                   color: AppTheme.muted,
                 )
-              : GoogleFonts.dmMono(
+              : AppTheme.monoLarge.copyWith(
                   fontSize: 24,
                   fontWeight: FontWeight.w400,
                   color: AppTheme.ink,

@@ -1,6 +1,5 @@
 // lib/widgets/hearth_ui.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 
 class HearthAvatar extends StatelessWidget {
@@ -35,7 +34,7 @@ class HearthAvatar extends StatelessWidget {
             errorBuilder: (context, error, stackTrace) => Center(
               child: Text(
                 initial,
-                style: GoogleFonts.newsreader(
+                style: AppTheme.titleStyle(
                   color: Colors.white,
                   fontSize: size * 0.45,
                   fontWeight: FontWeight.normal,
@@ -58,7 +57,7 @@ class HearthAvatar extends StatelessWidget {
       content = Center(
         child: Text(
           initial,
-          style: GoogleFonts.newsreader(
+          style: AppTheme.titleStyle(
             color: Colors.white,
             fontSize: size * 0.45,
             fontWeight: FontWeight.normal,
@@ -125,9 +124,8 @@ class ResidentBadge extends StatelessWidget {
             child: Text(
               name,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.instrumentSans(
+              style: AppTheme.sansSmall.copyWith(
                 color: badgeColor,
-                fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -448,8 +446,7 @@ class HearthSegmented<T> extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   labelBuilder(opt),
-                  style: GoogleFonts.instrumentSans(
-                    fontSize: 14,
+                  style: AppTheme.sansMedium.copyWith(
                     fontWeight: FontWeight.w500,
                     color: isSelected ? AppTheme.ink : AppTheme.muted,
                   ),
@@ -496,9 +493,8 @@ class HearthSelect<T> extends StatelessWidget {
           hint: placeholder != null
               ? Text(
                   placeholder!,
-                  style: GoogleFonts.instrumentSans(
+                  style: AppTheme.sansMedium.copyWith(
                     color: AppTheme.muted.withValues(alpha: 0.7),
-                    fontSize: 14,
                   ),
                 )
               : null,
@@ -508,10 +504,7 @@ class HearthSelect<T> extends StatelessWidget {
               value: item,
               child: Text(
                 labelBuilder(item),
-                style: GoogleFonts.instrumentSans(
-                  color: AppTheme.ink,
-                  fontSize: 14,
-                ),
+                style: AppTheme.sansMedium,
                 overflow: TextOverflow.ellipsis,
               ),
             );

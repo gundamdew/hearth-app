@@ -1,7 +1,6 @@
 // lib/screens/meals_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/meal_models.dart';
 import '../models/inventory_item.dart';
@@ -17,21 +16,14 @@ class MealsScreen extends ConsumerStatefulWidget {
 }
 
 class _MealsScreenState extends ConsumerState<MealsScreen> {
-  final TextEditingController _recipeNameCtrl = TextEditingController();
-  final TextEditingController _prepTimeCtrl = TextEditingController(text: '30');
-  final TextEditingController _ingQtyCtrl = TextEditingController(text: '1');
-  String? _selectedInventoryId;
-  final List<RecipeIngredient> _draftIngredients = [];
 
-  @override
-  void dispose() {
-    _recipeNameCtrl.dispose();
-    _prepTimeCtrl.dispose();
-    _ingQtyCtrl.dispose();
-    super.dispose();
-  }
-
-  void _showAssignRecipeModal(BuildContext context, MealPlan plan, List<Recipe> recipes, List<InventoryItem> inventory) {
+  void _showAssignRecipeModal(
+    BuildContext context,
+    MealPlan plan,
+    List<Recipe> recipes,
+    Map<String, InventoryItem> inventoryMap,
+    Map<String, InventoryItem> inventoryByNameMap,
+  ) {
     final dayLabel = _getDayLabel(plan.date);
 
     showHearthModal(
@@ -42,8 +34,8 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
         children: recipes.map((recipe) {
           int missingCount = 0;
           for (var ing in recipe.ingredients) {
-            final matches = inventory.where((i) => i.id == ing.inventoryId || i.name.toLowerCase() == ing.name.toLowerCase());
-            final stockedQty = matches.isNotEmpty ? matches.first.quantity : 0;
+            final item = inventoryMap[ing.inventoryId] ?? inventoryByNameMap[ing.name.toLowerCase()];
+            final stockedQty = item?.quantity ?? 0;
             if (stockedQty < ing.quantity) {
               missingCount++;
             }
@@ -76,7 +68,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                         const SizedBox(height: 2),
                         Text(
                           '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
-                          style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                          style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                         ),
                       ],
                     ),
@@ -84,7 +76,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                   if (missingCount > 0)
                     Text(
                       'Brak: $missingCount',
-                      style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.danger, fontWeight: FontWeight.w500),
+                      style: AppTheme.sansSmall.copyWith(color: AppTheme.danger, fontWeight: FontWeight.w500),
                     )
                   else
                     const Icon(Icons.check, size: 16, color: AppTheme.moss),
@@ -127,6 +119,9 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
     final mealPlans = mealsAsync.value ?? [];
     final recipes = recipesAsync.value ?? [];
     final inventory = inventoryAsync.value ?? [];
+    final recipesMap = ref.watch(recipesMapProvider);
+    final inventoryMap = ref.watch(inventoryMapProvider);
+    final inventoryByNameMap = ref.watch(inventoryByNameMapProvider);
 
     final plannedCount = mealPlans.where((p) => p.recipeId != null).length;
 
@@ -139,7 +134,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
           title: 'Nadchodzące menu',
           action: Text(
             '$plannedCount z 14 zaplanowanych',
-            style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+            style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
           ),
         ),
         SizedBox(
@@ -153,12 +148,13 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
               final plan = mealPlans[index];
               final dayLabel = _getDayLabel(plan.date);
               final isToday = dayLabel == 'Dziś';
-              final recipeMatches = recipes.where((r) => r.id == plan.recipeId);
-              final recipe = recipeMatches.isNotEmpty ? recipeMatches.first : null;
+              final recipe = plan.recipeId != null ? recipesMap[plan.recipeId] : null;
 
               if (recipe == null) {
-                return GestureDetector(
-                  onTap: () => _showAssignRecipeModal(context, plan, recipes, inventory),
+                return RepaintBoundary(
+                  key: ValueKey('carousel_${plan.id}'),
+                  child: GestureDetector(
+                    onTap: () => _showAssignRecipeModal(context, plan, recipes, inventoryMap, inventoryByNameMap),
                   child: Container(
                     width: 175,
                     height: 175,
@@ -198,10 +194,13 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       ],
                     ),
                   ),
+                ),
                 );
               }
 
-              return Container(
+              return RepaintBoundary(
+                key: ValueKey('carousel_${plan.id}'),
+                child: Container(
                 width: 175,
                 height: 175,
                 padding: const EdgeInsets.all(16),
@@ -251,7 +250,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       '${recipe.prepTime ?? 30} min',
-                      style: GoogleFonts.dmMono(fontSize: 11, color: AppTheme.muted),
+                      style: AppTheme.monoSmall.copyWith(fontSize: 11, color: AppTheme.muted),
                     ),
                     const Spacer(),
                     if (plan.isCooked)
@@ -268,7 +267,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                             const SizedBox(width: 4),
                             Text(
                               'Gotowe',
-                              style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.moss),
+                              style: AppTheme.sansSmall.copyWith(fontWeight: FontWeight.w500, color: AppTheme.moss),
                             ),
                           ],
                         ),
@@ -289,7 +288,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 'Gotuj',
-                                style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.white),
+                                style: AppTheme.sansSmall.copyWith(fontWeight: FontWeight.w500, color: Colors.white),
                               ),
                             ],
                           ),
@@ -297,6 +296,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       ),
                   ],
                 ),
+              ),
               );
             },
           ),
@@ -325,9 +325,11 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
               itemBuilder: (context, index) {
                 final r = recipes[index];
 
-                return Container(
-                  decoration: AppTheme.cardDecoration,
-                  padding: const EdgeInsets.all(20),
+                return RepaintBoundary(
+                  key: ValueKey(r.id),
+                  child: Container(
+                    decoration: AppTheme.cardDecoration,
+                    padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -340,15 +342,15 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       const SizedBox(height: 4),
                       Text(
                         '${r.ingredients.length} składników · ${r.prepTime ?? 30} min',
-                        style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                        style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                       ),
                       const Spacer(),
                       Wrap(
                         spacing: 6,
                         runSpacing: 6,
                         children: r.ingredients.map((ing) {
-                          final invMatches = inventory.where((i) => i.id == ing.inventoryId || i.name.toLowerCase() == ing.name.toLowerCase());
-                          final hasStock = invMatches.isNotEmpty && invMatches.first.quantity >= ing.quantity;
+                          final item = inventoryMap[ing.inventoryId] ?? inventoryByNameMap[ing.name.toLowerCase()];
+                          final hasStock = item != null && item.quantity >= ing.quantity;
 
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -367,8 +369,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                                 const SizedBox(width: 4),
                                 Text(
                                   '${ing.quantity} ${ing.name}',
-                                  style: GoogleFonts.instrumentSans(
-                                    fontSize: 11,
+                                  style: AppTheme.sansTiny.copyWith(
                                     color: hasStock ? AppTheme.moss : AppTheme.danger,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -380,6 +381,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                       ),
                     ],
                   ),
+                ),
                 );
               },
             );
@@ -388,8 +390,64 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
       ],
     );
 
-    // Draft Recipe Form
-    final recipeForm = FormCard(
+    // Isolated Draft Recipe Form
+    final recipeForm = _DraftRecipeFormCard(inventory: inventory);
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          carouselSection,
+          const SizedBox(height: 36),
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: recipeBoxSection),
+                const SizedBox(width: 32),
+                Expanded(flex: 5, child: recipeForm),
+              ],
+            ),
+          ] else ...[
+            recipeBoxSection,
+            const SizedBox(height: 32),
+            recipeForm,
+          ],
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
+  }
+}
+
+class _DraftRecipeFormCard extends ConsumerStatefulWidget {
+  final List<InventoryItem> inventory;
+
+  const _DraftRecipeFormCard({required this.inventory});
+
+  @override
+  ConsumerState<_DraftRecipeFormCard> createState() => _DraftRecipeFormCardState();
+}
+
+class _DraftRecipeFormCardState extends ConsumerState<_DraftRecipeFormCard> {
+  final TextEditingController _recipeNameCtrl = TextEditingController();
+  final TextEditingController _prepTimeCtrl = TextEditingController(text: '30');
+  final TextEditingController _ingQtyCtrl = TextEditingController(text: '1');
+  String? _selectedInventoryId;
+  final List<RecipeIngredient> _draftIngredients = [];
+
+  @override
+  void dispose() {
+    _recipeNameCtrl.dispose();
+    _prepTimeCtrl.dispose();
+    _ingQtyCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FormCard(
       sub: 'Książka przepisów',
       title: 'Utwórz nowy przepis',
       child: Column(
@@ -402,7 +460,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Nazwa przepisu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Nazwa przepisu', style: AppTheme.sansLabel),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _recipeNameCtrl,
@@ -417,12 +475,12 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Czas (min)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Czas (min)', style: AppTheme.sansLabel),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _prepTimeCtrl,
                       keyboardType: TextInputType.number,
-                      style: GoogleFonts.dmMono(fontSize: 14),
+                      style: AppTheme.monoMedium,
                       decoration: const InputDecoration(hintText: '30'),
                     ),
                   ],
@@ -431,7 +489,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Text('Składniki', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Składniki', style: AppTheme.sansLabel),
           const SizedBox(height: 6),
 
           // Added ingredients list
@@ -453,7 +511,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     child: Row(
                       children: [
-                        Text('${ing.quantity}', style: GoogleFonts.dmMono(fontSize: 13, color: AppTheme.ink)),
+                        Text('${ing.quantity}', style: AppTheme.monoSmall.copyWith(fontSize: 13, color: AppTheme.ink)),
                         const SizedBox(width: 12),
                         Expanded(child: Text(ing.name, style: const TextStyle(fontSize: 14))),
                         IconButton(
@@ -461,7 +519,9 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                           splashRadius: 14,
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                          onPressed: () => setState(() => _draftIngredients.removeAt(index)),
+                          onPressed: () {
+                            setState(() => _draftIngredients.removeAt(index));
+                          },
                         ),
                       ],
                     ),
@@ -478,7 +538,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: TextField(
                   controller: _ingQtyCtrl,
                   keyboardType: TextInputType.number,
-                  style: GoogleFonts.dmMono(fontSize: 14),
+                  style: AppTheme.monoMedium,
                   decoration: const InputDecoration(hintText: '1'),
                 ),
               ),
@@ -487,12 +547,17 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
                 child: HearthSelect<String>(
                   value: _selectedInventoryId ?? '',
                   placeholder: 'Wybierz ze spiżarni',
-                  items: inventory.map((i) => i.id).toList(),
+                  items: widget.inventory.map((i) => i.id).toList(),
                   onChanged: (val) {
-                    if (val != null) setState(() => _selectedInventoryId = val);
+                    if (val != null) {
+                      setState(() => _selectedInventoryId = val);
+                    }
                   },
                   labelBuilder: (id) {
-                    final item = inventory.firstWhere((i) => i.id == id, orElse: () => InventoryItem(id: '', name: '', location: '', quantity: 0, unit: '', lowStockThreshold: 1));
+                    final item = widget.inventory.firstWhere(
+                      (i) => i.id == id,
+                      orElse: () => InventoryItem(id: '', name: '', location: '', quantity: 0, unit: '', lowStockThreshold: 1),
+                    );
                     return '${item.name} (${item.unit})';
                   },
                 ),
@@ -507,7 +572,7 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
               onPressed: _selectedInventoryId == null
                   ? null
                   : () {
-                      final item = inventory.firstWhere((i) => i.id == _selectedInventoryId);
+                      final item = widget.inventory.firstWhere((i) => i.id == _selectedInventoryId);
                       final qty = int.tryParse(_ingQtyCtrl.text) ?? 1;
                       setState(() {
                         _draftIngredients.add(RecipeIngredient(
@@ -544,32 +609,6 @@ class _MealsScreenState extends ConsumerState<MealsScreen> {
               child: const Text('Zapisz przepis'),
             ),
           ),
-        ],
-      ),
-    );
-
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          carouselSection,
-          const SizedBox(height: 36),
-          if (isDesktop) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 7, child: recipeBoxSection),
-                const SizedBox(width: 32),
-                Expanded(flex: 5, child: recipeForm),
-              ],
-            ),
-          ] else ...[
-            recipeBoxSection,
-            const SizedBox(height: 32),
-            recipeForm,
-          ],
-          const SizedBox(height: 48),
         ],
       ),
     );

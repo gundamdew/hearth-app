@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'firebase_options.dart';
 import 'theme.dart';
 import 'widgets/hearth_ui.dart';
@@ -104,11 +103,13 @@ class MainScaffold extends ConsumerWidget {
       return const LoginScreen();
     }
 
-    final notificationsAsync = ref.watch(notificationsStreamProvider);
-    final notifications = notificationsAsync.value ?? [];
-    final unreadCount = notifications
-        .where((n) => !n.readBy.contains(currentUser.name))
-        .length;
+    final unreadCount = ref.watch(notificationsStreamProvider.select((asyncList) {
+      final list = asyncList.value;
+      if (list == null) {
+        return 0;
+      }
+      return list.where((n) => !n.readBy.contains(currentUser.name)).length;
+    }));
 
     final mealPlans = ref.watch(mealPlanProvider).value ?? [];
     final recipes = ref.watch(recipesProvider).value ?? [];
@@ -163,11 +164,12 @@ class MainScaffold extends ConsumerWidget {
           child: Column(
             children: [
               // Sticky Top Navigation Header
-              Container(
-                decoration: const BoxDecoration(
-                  color: Color.fromRGBO(247, 245, 240, 0.85),
-                  border: Border(bottom: BorderSide(color: AppTheme.line)),
-                ),
+              RepaintBoundary(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color.fromRGBO(247, 245, 240, 0.85),
+                    border: Border(bottom: BorderSide(color: AppTheme.line)),
+                  ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1440),
@@ -278,7 +280,7 @@ class MainScaffold extends ConsumerWidget {
                                             alignment: Alignment.center,
                                             child: Text(
                                               unreadCount > 9 ? '9+' : '$unreadCount',
-                                              style: GoogleFonts.dmMono(
+                                              style: AppTheme.monoSmall.copyWith(
                                                 fontSize: 9,
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.white,
@@ -363,6 +365,7 @@ class MainScaffold extends ConsumerWidget {
                   ),
                 ),
               ),
+              ),
 
               // Main Content Area
               Expanded(
@@ -396,7 +399,8 @@ class MainScaffold extends ConsumerWidget {
 
               // Mobile Bottom Navigation Bar (< 600px)
               if (isMobile)
-                Container(
+                RepaintBoundary(
+                  child: Container(
                   decoration: const BoxDecoration(
                     color: Color.fromRGBO(255, 255, 255, 0.92),
                     border: Border(top: BorderSide(color: AppTheme.line)),
@@ -448,6 +452,7 @@ class MainScaffold extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ),
                 ),
             ],
           ),

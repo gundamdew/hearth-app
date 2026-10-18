@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/inventory_item.dart';
@@ -9,13 +10,44 @@ final inventoryProvider = StreamProvider<List<InventoryItem>>((ref) {
   );
 });
 
-final inventoryControllerProvider = Provider((ref) => InventoryController(ref));
+final inventoryMapProvider = Provider<Map<String, InventoryItem>>((ref) {
+  final items = ref.watch(inventoryProvider).value ?? [];
+  return {for (final item in items) item.id: item};
+});
+
+final inventoryByNameMapProvider = Provider<Map<String, InventoryItem>>((ref) {
+  final items = ref.watch(inventoryProvider).value ?? [];
+  return {for (final item in items) item.name.toLowerCase(): item};
+});
+
+final inventoryControllerProvider = Provider((ref) {
+  final controller = InventoryController(ref);
+  ref.onDispose(() => controller.dispose());
+  return controller;
+});
 
 class InventoryController {
   final Ref _ref;
   final _db = FirebaseFirestore.instance;
 
+  final Map<String, int> _pendingQuantities = {};
+  final Map<String, int> _originalQuantities = {};
+  final Map<String, Timer> _debounceTimers = {};
+  final Map<String, InventoryItem> _cachedItems = {};
+  final Map<String, String?> _cachedActors = {};
+
   InventoryController(this._ref);
+
+  void dispose() {
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    _pendingQuantities.clear();
+    _originalQuantities.clear();
+    _cachedItems.clear();
+    _cachedActors.clear();
+  }
 
   Future<void> addItem(String name, String location, int quantity, String unit, int threshold) async {
     final item = InventoryItem(
@@ -36,26 +68,62 @@ class InventoryController {
     InventoryItem? item,
     String? actorName,
   }) async {
-    final newQty = (currentQty + delta).clamp(0, 999);
-    await _db.collection('inventory').doc(id).update({'quantity': newQty});
+    // Record original quantity if not already pending
+    if (!_originalQuantities.containsKey(id)) {
+      _originalQuantities[id] = currentQty;
+    }
 
-    InventoryItem? target = item;
-    if (target == null) {
-      final doc = await _db.collection('inventory').doc(id).get();
-      final data = doc.data();
-      if (data != null) {
-        target = InventoryItem.fromFirestore(data, doc.id);
+    // Accumulate quantity
+    final baseQty = _pendingQuantities[id] ?? currentQty;
+    final accumulatedQty = (baseQty + delta).clamp(0, 999);
+    _pendingQuantities[id] = accumulatedQty;
+
+    if (item != null) {
+      _cachedItems[id] = item;
+    }
+    if (actorName != null) {
+      _cachedActors[id] = actorName;
+    }
+
+    // Cancel existing debounce timer for this item
+    _debounceTimers[id]?.cancel();
+
+    // Start 400ms debounce timer to protect Firestore Spark limits
+    _debounceTimers[id] = Timer(const Duration(milliseconds: 400), () async {
+      final finalQty = _pendingQuantities.remove(id);
+      final origQty = _originalQuantities.remove(id) ?? currentQty;
+      final cachedItem = _cachedItems.remove(id);
+      final cachedActor = _cachedActors.remove(id);
+      _debounceTimers.remove(id);
+
+      if (finalQty == null || finalQty == origQty) {
+        return;
       }
-    }
 
-    if (target != null && delta < 0 && newQty <= target.lowStockThreshold) {
-      await _ref.read(notificationControllerProvider).dispatchNotification(
-        title: 'Running Low: ${target.name}',
-        body: 'Only $newQty ${target.unit} left in ${target.location}.',
-        category: 'inventory',
-        actorName: actorName ?? 'Inventory',
-      );
-    }
+      try {
+        await _db.collection('inventory').doc(id).update({'quantity': finalQty});
+
+        InventoryItem? target = cachedItem;
+        if (target == null) {
+          final doc = await _db.collection('inventory').doc(id).get();
+          final data = doc.data();
+          if (data != null) {
+            target = InventoryItem.fromFirestore(data, doc.id);
+          }
+        }
+
+        if (target != null && finalQty < origQty && finalQty <= target.lowStockThreshold) {
+          await _ref.read(notificationControllerProvider).dispatchNotification(
+            title: 'Running Low: ${target.name}',
+            body: 'Only $finalQty ${target.unit} left in ${target.location}.',
+            category: 'inventory',
+            actorName: cachedActor ?? 'Inventory',
+          );
+        }
+      } catch (e) {
+        // Prevent crashes on network failure
+      }
+    });
   }
 
   Future<void> removeItem(String id) async {

@@ -9,6 +9,11 @@ final usersProvider = StreamProvider<List<AppUser>>((ref) {
   );
 });
 
+final usersByNameMapProvider = Provider<Map<String, AppUser>>((ref) {
+  final users = ref.watch(usersProvider).value ?? [];
+  return {for (final u in users) u.name: u};
+});
+
 final usersControllerProvider = Provider((ref) => UsersController());
 
 class UsersController {

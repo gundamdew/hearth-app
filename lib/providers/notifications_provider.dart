@@ -13,7 +13,9 @@ import '../models/inventory_item.dart';
 export '../models/notification_model.dart';
 
 final pushNotificationServiceProvider = Provider<PushNotificationService>((ref) {
-  return PushNotificationService();
+  final service = PushNotificationService();
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 class PushNotificationService {
@@ -23,6 +25,12 @@ class PushNotificationService {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _firestoreRelaySubscription;
   DateTime _sessionStartTime = DateTime.now();
   AppUser? _currentUser;
+
+  void dispose() {
+    _firestoreRelaySubscription?.cancel();
+    _firestoreRelaySubscription = null;
+    _currentUser = null;
+  }
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'hearth_high_importance_channel',

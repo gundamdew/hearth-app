@@ -1,7 +1,6 @@
 // lib/screens/inventory_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/inventory_item.dart';
 import '../providers/inventory_provider.dart';
@@ -14,23 +13,27 @@ class InventoryScreen extends ConsumerStatefulWidget {
   ConsumerState<InventoryScreen> createState() => _InventoryScreenState();
 }
 
+String _locDisplay(String loc) {
+  switch (loc) {
+    case 'Fridge':
+      return 'Lodówka';
+    case 'Pantry':
+      return 'Spiżarnia';
+    case 'Household':
+      return 'Chemia domowa';
+    default:
+      return loc;
+  }
+}
+
 class _InventoryScreenState extends ConsumerState<InventoryScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _filter = 'All';
   String _searchQuery = '';
 
-  final TextEditingController _nameCtrl = TextEditingController();
-  final TextEditingController _qtyCtrl = TextEditingController(text: '1');
-  final TextEditingController _minCtrl = TextEditingController(text: '1');
-  String _selectedLoc = 'Pantry';
-  String _selectedUnit = 'szt.';
-
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _nameCtrl.dispose();
-    _qtyCtrl.dispose();
-    _minCtrl.dispose();
     super.dispose();
   }
 
@@ -44,19 +47,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
         return 'CHEMIA DOMOWA';
       default:
         return loc.toUpperCase();
-    }
-  }
-
-  String _locDisplay(String loc) {
-    switch (loc) {
-      case 'Fridge':
-        return 'Lodówka';
-      case 'Pantry':
-        return 'Spiżarnia';
-      case 'Household':
-        return 'Chemia domowa';
-      default:
-        return loc;
     }
   }
 
@@ -95,13 +85,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
             children: [
               Text(
                 'Wklej wiadomość z czatu lub listy. Jedna pozycja w wierszu — Nazwa – ilość jednostka.',
-                style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.muted),
+                style: AppTheme.sansMedium.copyWith(color: AppTheme.muted),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: textCtrl,
                 maxLines: 6,
-                style: GoogleFonts.dmMono(fontSize: 13),
+                style: AppTheme.monoSmall.copyWith(fontSize: 13),
                 decoration: const InputDecoration(
                   hintText: '* Kurczak – 2 szt.\n* Masło – 6 szt.',
                 ),
@@ -144,8 +134,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               ),
                               child: Text(
                                 row.isExisting ? 'AKTUALIZACJA' : 'NOWY',
-                                style: GoogleFonts.instrumentSans(
-                                  fontSize: 10,
+                                style: AppTheme.sansTiny.copyWith(
                                   fontWeight: FontWeight.w600,
                                   color: row.isExisting ? AppTheme.moss : AppTheme.amber,
                                 ),
@@ -154,7 +143,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                             const SizedBox(width: 8),
                             Text(
                               '+${row.qty} ${row.unit}',
-                              style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.ink),
+                              style: AppTheme.monoSmall,
                             ),
                           ],
                         ),
@@ -305,8 +294,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       ),
                       child: Text(
                         '$lowCount',
-                        style: GoogleFonts.dmMono(
-                          fontSize: 12,
+                        style: AppTheme.monoSmall.copyWith(
                           color: _filter == 'Running low' ? Colors.white : AppTheme.danger,
                         ),
                       ),
@@ -376,7 +364,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                       children: [
                         Text(_locLabel(loc), style: AppTheme.microStyle),
                         const SizedBox(width: 6),
-                        Text('${locItems.length}', style: GoogleFonts.dmMono(fontSize: 11, color: AppTheme.muted)),
+                        Text('${locItems.length}', style: AppTheme.monoSmall.copyWith(fontSize: 11, color: AppTheme.muted)),
                       ],
                     ),
                   ),
@@ -392,8 +380,10 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                         final item = locItems[index];
                         final isLow = item.isRunningLow;
 
-                        return Dismissible(
-                          key: Key(item.id),
+                        return RepaintBoundary(
+                          key: ValueKey(item.id),
+                          child: Dismissible(
+                            key: Key(item.id),
                           direction: DismissDirection.endToStart,
                           background: Container(
                             color: AppTheme.danger,
@@ -457,7 +447,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                               ),
                                               child: Text(
                                                 'NISKI STAN',
-                                                style: GoogleFonts.instrumentSans(
+                                                style: AppTheme.sansTiny.copyWith(
                                                   color: AppTheme.danger,
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
@@ -471,7 +461,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                       const SizedBox(height: 2),
                                       Text(
                                         'Uzupełnij poniżej ${item.lowStockThreshold}',
-                                        style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                        style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                                       ),
                                     ],
                                   ),
@@ -498,7 +488,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                                         child: Text(
                                           '${item.quantity} ${item.unit}',
                                           textAlign: TextAlign.center,
-                                          style: GoogleFonts.dmMono(
+                                          style: AppTheme.monoSmall.copyWith(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w500,
                                             color: isLow ? AppTheme.danger : AppTheme.ink,
@@ -519,6 +509,7 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                               ],
                             ),
                           ),
+                        ),
                         );
                       },
                     ),
@@ -530,26 +521,82 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ],
     );
 
-    final rightPanel = FormCard(
+    final rightPanel = _AddInventoryItemFormCard(locations: locations);
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isDesktop) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 7, child: leftPanel),
+                const SizedBox(width: 32),
+                Expanded(flex: 5, child: rightPanel),
+              ],
+            ),
+          ] else ...[
+            leftPanel,
+            const SizedBox(height: 32),
+            rightPanel,
+          ],
+          const SizedBox(height: 48),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddInventoryItemFormCard extends ConsumerStatefulWidget {
+  final List<String> locations;
+
+  const _AddInventoryItemFormCard({required this.locations});
+
+  @override
+  ConsumerState<_AddInventoryItemFormCard> createState() => _AddInventoryItemFormCardState();
+}
+
+class _AddInventoryItemFormCardState extends ConsumerState<_AddInventoryItemFormCard> {
+  final TextEditingController _nameCtrl = TextEditingController();
+  final TextEditingController _qtyCtrl = TextEditingController(text: '1');
+  final TextEditingController _minCtrl = TextEditingController(text: '1');
+  String _selectedLoc = 'Pantry';
+  String _selectedUnit = 'szt.';
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _qtyCtrl.dispose();
+    _minCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FormCard(
       sub: 'Zapasy',
       title: 'Dodaj produkt',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Nazwa produktu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Nazwa produktu', style: AppTheme.sansLabel),
           const SizedBox(height: 6),
           TextField(
             controller: _nameCtrl,
             decoration: const InputDecoration(hintText: 'np. Pomidory koktajlowe'),
           ),
           const SizedBox(height: 16),
-          Text('Miejsce przechowywania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+          Text('Miejsce przechowywania', style: AppTheme.sansLabel),
           const SizedBox(height: 6),
           HearthSelect<String>(
             value: _selectedLoc,
-            items: locations,
+            items: widget.locations,
             onChanged: (val) {
-              if (val != null) setState(() => _selectedLoc = val);
+              if (val != null) {
+                setState(() => _selectedLoc = val);
+              }
             },
             labelBuilder: _locDisplay,
           ),
@@ -560,12 +607,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Ilość', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Ilość', style: AppTheme.sansLabel),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _qtyCtrl,
                       keyboardType: TextInputType.number,
-                      style: GoogleFonts.dmMono(fontSize: 14),
+                      style: AppTheme.monoMedium,
                       decoration: const InputDecoration(hintText: '1'),
                     ),
                   ],
@@ -576,13 +623,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Jednostka', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Jednostka', style: AppTheme.sansLabel),
                     const SizedBox(height: 6),
                     HearthSelect<String>(
                       value: _selectedUnit,
                       items: const ['szt.', 'op.', 'porcja', 'kg', 'l'],
                       onChanged: (val) {
-                        if (val != null) setState(() => _selectedUnit = val);
+                        if (val != null) {
+                          setState(() => _selectedUnit = val);
+                        }
                       },
                       labelBuilder: (u) => u,
                     ),
@@ -594,12 +643,12 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Min. stan', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Min. stan', style: AppTheme.sansLabel),
                     const SizedBox(height: 6),
                     TextField(
                       controller: _minCtrl,
                       keyboardType: TextInputType.number,
-                      style: GoogleFonts.dmMono(fontSize: 14),
+                      style: AppTheme.monoMedium,
                       decoration: const InputDecoration(hintText: '1'),
                     ),
                   ],
@@ -633,30 +682,6 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
               child: const Text('Dodaj do spiżarni'),
             ),
           ),
-        ],
-      ),
-    );
-
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (isDesktop) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 7, child: leftPanel),
-                const SizedBox(width: 32),
-                Expanded(flex: 5, child: rightPanel),
-              ],
-            ),
-          ] else ...[
-            leftPanel,
-            const SizedBox(height: 32),
-            rightPanel,
-          ],
-          const SizedBox(height: 48),
         ],
       ),
     );

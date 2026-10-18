@@ -1,7 +1,6 @@
 // lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../models/user_model.dart';
 import '../providers/users_provider.dart';
@@ -47,7 +46,7 @@ class SettingsScreen extends ConsumerWidget {
                       const SizedBox(height: 6),
                       Text(
                         'Podgląd awatara',
-                        style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                        style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                       ),
                     ],
                   ),
@@ -55,7 +54,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 // Name
-                Text('Imię', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                Text('Imię', style: AppTheme.sansLabel),
                 const SizedBox(height: 6),
                 TextField(
                   controller: nameCtrl,
@@ -67,7 +66,7 @@ class SettingsScreen extends ConsumerWidget {
                 // PIN
                 Text(
                   user == null ? '4-cyfrowy PIN' : 'Nowy 4-cyfrowy PIN (pozostaw puste, aby zachować)',
-                  style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted),
+                  style: AppTheme.sansLabel,
                 ),
                 const SizedBox(height: 6),
                 TextField(
@@ -75,7 +74,7 @@ class SettingsScreen extends ConsumerWidget {
                   keyboardType: TextInputType.number,
                   maxLength: 4,
                   obscureText: true,
-                  style: GoogleFonts.dmMono(fontSize: 16, letterSpacing: 8),
+                  style: AppTheme.monoLarge.copyWith(fontSize: 16, letterSpacing: 8),
                   decoration: const InputDecoration(
                     hintText: '••••',
                     counterText: '',
@@ -88,7 +87,7 @@ class SettingsScreen extends ConsumerWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Wybierz awatar', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                    Text('Wybierz awatar', style: AppTheme.sansLabel),
                     if (pickedAvatar != null)
                       GestureDetector(
                         onTap: () {
@@ -99,7 +98,7 @@ class SettingsScreen extends ConsumerWidget {
                         },
                         child: Text(
                           'Wyczyść (użyj inicjałów)',
-                          style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.terra, fontWeight: FontWeight.w500),
+                          style: AppTheme.sansSmall.copyWith(color: AppTheme.terra, fontWeight: FontWeight.w500),
                         ),
                       ),
                   ],
@@ -137,7 +136,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
 
                 // Custom Avatar Input (URL or custom emoji)
-                Text('Własny awatar (link URL lub własne emoji)', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                Text('Własny awatar (link URL lub własne emoji)', style: AppTheme.sansLabel),
                 const SizedBox(height: 6),
                 TextField(
                   controller: avatarCtrl,
@@ -154,7 +153,7 @@ class SettingsScreen extends ConsumerWidget {
                 const SizedBox(height: 16),
 
                 // Color Selection
-                Text('Kolor profilu', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
+                Text('Kolor profilu', style: AppTheme.sansLabel),
                 const SizedBox(height: 10),
                 Row(
                   children: AppTheme.residentColors.map((color) {
@@ -274,7 +273,7 @@ class SettingsScreen extends ConsumerWidget {
                               const SizedBox(height: 3),
                               Text(
                                 'Otrzymuj alerty o wydatkach, zadaniach i stanie zapasów na bieżąco.',
-                                style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+                                style: AppTheme.sansMedium.copyWith(fontSize: 13, color: AppTheme.muted),
                               ),
                             ],
                           ),
@@ -310,7 +309,7 @@ class SettingsScreen extends ConsumerWidget {
                         Expanded(
                           child: Text(
                             'Sprawdź działanie powiadomień i szuflady Hearth Pulse',
-                            style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+                            style: AppTheme.sansMedium.copyWith(fontSize: 13, color: AppTheme.muted),
                           ),
                         ),
                         ElevatedButton.icon(
@@ -385,7 +384,7 @@ class SettingsScreen extends ConsumerWidget {
                                       const SizedBox(width: 6),
                                       Text(
                                         '(Ty)',
-                                        style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                        style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                                       ),
                                     ],
                                   ],
@@ -393,7 +392,7 @@ class SettingsScreen extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   'PIN: ****',
-                                  style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                                  style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                                 ),
                               ],
                             ),

@@ -62,34 +62,144 @@ class AppTheme {
     ),
   );
 
-  // Typography Styles
-  static TextStyle get microStyle => GoogleFonts.instrumentSans(
+  // Cached Typography Styles (Prevents garbage collection thrashing in build methods)
+  static final TextStyle microHeader = GoogleFonts.instrumentSans(
     fontSize: 11,
     fontWeight: FontWeight.w600,
     letterSpacing: 1.1,
     color: muted,
   );
+  static final TextStyle microStyle = microHeader;
 
-  static TextStyle titleStyle({double fontSize = 28, FontWeight fontWeight = FontWeight.w400, Color? color, FontStyle? fontStyle}) => GoogleFonts.newsreader(
-    fontSize: fontSize,
-    fontWeight: fontWeight,
-    letterSpacing: -0.02 * fontSize,
-    color: color ?? ink,
-    fontStyle: fontStyle,
+  static final TextStyle monoSmall = GoogleFonts.dmMono(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle monoMedium = GoogleFonts.dmMono(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle monoLarge = GoogleFonts.dmMono(
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    color: ink,
+  );
+  static final TextStyle monoExtraLarge = GoogleFonts.dmMono(
+    fontSize: 32,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -0.5,
+    color: ink,
+  );
+  static final TextStyle monoHuge = GoogleFonts.dmMono(
+    fontSize: 44,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -1.0,
+    color: ink,
   );
 
-  static TextStyle uiStyle({double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) => GoogleFonts.instrumentSans(
-    fontSize: fontSize,
-    fontWeight: fontWeight,
-    color: color ?? ink,
+  static final TextStyle sansTiny = GoogleFonts.instrumentSans(
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle sansSmall = GoogleFonts.instrumentSans(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle sansLabel = GoogleFonts.instrumentSans(
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
+    color: muted,
+  );
+  static final TextStyle sansMedium = GoogleFonts.instrumentSans(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle sansBold = GoogleFonts.instrumentSans(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: ink,
+  );
+  static final TextStyle sansHeader = GoogleFonts.instrumentSans(
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+    color: ink,
   );
 
-  static TextStyle monoStyle({double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color, double? letterSpacing}) => GoogleFonts.dmMono(
-    fontSize: fontSize,
-    fontWeight: fontWeight,
-    color: color ?? ink,
-    letterSpacing: letterSpacing,
+  static final TextStyle titleSmall = GoogleFonts.newsreader(
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    color: ink,
   );
+  static final TextStyle titleMedium = GoogleFonts.newsreader(
+    fontSize: 20,
+    fontWeight: FontWeight.w400,
+    color: ink,
+  );
+  static final TextStyle titleLarge = GoogleFonts.newsreader(
+    fontSize: 28,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -0.56,
+    color: ink,
+  );
+  static final TextStyle titleDisplay = GoogleFonts.newsreader(
+    fontSize: 34,
+    fontWeight: FontWeight.w400,
+    letterSpacing: -0.68,
+    color: ink,
+  );
+
+  static TextStyle titleStyle({double fontSize = 28, FontWeight fontWeight = FontWeight.w400, Color? color, FontStyle? fontStyle}) {
+    if (fontSize == 28 && fontWeight == FontWeight.w400 && color == null && fontStyle == null) {
+      return titleLarge;
+    }
+    if (fontSize == 20 && fontWeight == FontWeight.w400 && color == null && fontStyle == null) {
+      return titleMedium;
+    }
+    return GoogleFonts.newsreader(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      letterSpacing: -0.02 * fontSize,
+      color: color ?? ink,
+      fontStyle: fontStyle,
+    );
+  }
+
+  static TextStyle uiStyle({double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (fontSize == 14 && fontWeight == FontWeight.w400 && color == null) {
+      return sansMedium;
+    }
+    if (fontSize == 12 && fontWeight == FontWeight.w400 && color == null) {
+      return sansSmall;
+    }
+    if (fontSize == 14 && fontWeight == FontWeight.w600 && color == null) {
+      return sansBold;
+    }
+    return GoogleFonts.instrumentSans(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? ink,
+    );
+  }
+
+  static TextStyle monoStyle({double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color, double? letterSpacing}) {
+    if (fontSize == 14 && fontWeight == FontWeight.w400 && color == null && letterSpacing == null) {
+      return monoMedium;
+    }
+    if (fontSize == 12 && fontWeight == FontWeight.w400 && color == null && letterSpacing == null) {
+      return monoSmall;
+    }
+    return GoogleFonts.dmMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? ink,
+      letterSpacing: letterSpacing,
+    );
+  }
 
   static ThemeData get lightTheme {
     return ThemeData(

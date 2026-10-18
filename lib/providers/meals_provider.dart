@@ -11,6 +11,11 @@ final recipesProvider = StreamProvider<List<Recipe>>((ref) {
   );
 });
 
+final recipesMapProvider = Provider<Map<String, Recipe>>((ref) {
+  final recipes = ref.watch(recipesProvider).value ?? [];
+  return {for (final r in recipes) r.id: r};
+});
+
 final mealPlanProvider = StreamProvider<List<MealPlan>>((ref) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);

@@ -1,7 +1,6 @@
 // lib/widgets/hearth_pulse_drawer.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/user_model.dart';
@@ -121,7 +120,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                         ),
                         child: Text(
                           unreadCount > 0 ? '$unreadCount UNREAD' : 'ALL READ',
-                          style: GoogleFonts.dmMono(
+                          style: AppTheme.monoSmall.copyWith(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
                             color: unreadCount > 0 ? AppTheme.danger : AppTheme.muted,
@@ -140,7 +139,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                         icon: const Icon(Icons.done_all, size: 16),
                         label: Text(
                           'Mark all as read',
-                          style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500),
+                          style: AppTheme.sansLabel.copyWith(color: AppTheme.moss),
                         ),
                         style: TextButton.styleFrom(
                           foregroundColor: AppTheme.moss,
@@ -166,7 +165,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                     padding: const EdgeInsets.all(24.0),
                     child: Text(
                       'Błąd wczytywania powiadomień: $err',
-                      style: GoogleFonts.instrumentSans(color: AppTheme.danger),
+                      style: AppTheme.sansMedium.copyWith(color: AppTheme.danger),
                     ),
                   ),
                 ),
@@ -189,7 +188,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             'No recent activity logged yet.',
-                            style: GoogleFonts.instrumentSans(fontSize: 13, color: AppTheme.muted),
+                            style: AppTheme.sansMedium.copyWith(fontSize: 13, color: AppTheme.muted),
                           ),
                         ],
                       ),
@@ -267,10 +266,8 @@ class HearthPulseDrawer extends ConsumerWidget {
                                         Expanded(
                                           child: Text(
                                             item.title,
-                                            style: GoogleFonts.instrumentSans(
-                                              fontSize: 14,
+                                            style: AppTheme.sansMedium.copyWith(
                                               fontWeight: isUnread ? FontWeight.w600 : FontWeight.w500,
-                                              color: AppTheme.ink,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -290,7 +287,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                                     const SizedBox(height: 3),
                                     Text(
                                       item.body,
-                                      style: GoogleFonts.instrumentSans(
+                                      style: AppTheme.sansMedium.copyWith(
                                         fontSize: 13,
                                         color: isUnread ? AppTheme.ink : AppTheme.muted,
                                         height: 1.3,
@@ -302,7 +299,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                                       children: [
                                         Text(
                                           _formatRelativeTime(item.createdAt),
-                                          style: GoogleFonts.dmMono(
+                                          style: AppTheme.monoSmall.copyWith(
                                             fontSize: 11,
                                             color: AppTheme.muted,
                                           ),
@@ -315,8 +312,7 @@ class HearthPulseDrawer extends ConsumerWidget {
                                           ),
                                           child: Text(
                                             item.actorName,
-                                            style: GoogleFonts.instrumentSans(
-                                              fontSize: 11,
+                                            style: AppTheme.sansTiny.copyWith(
                                               fontWeight: FontWeight.w500,
                                               color: AppTheme.muted,
                                             ),

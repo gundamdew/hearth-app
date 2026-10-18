@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/meal_models.dart';
@@ -40,9 +39,10 @@ class OverviewScreen extends ConsumerWidget {
     final budgetState = budgetAsync.value ?? BudgetState(categories: [], expenses: [], incomes: []);
     final inventory = inventoryAsync.value ?? [];
     final mealPlan = mealPlanAsync.value ?? [];
-    final recipes = recipesAsync.value ?? [];
     final chores = choresAsync.value ?? [];
     final users = usersAsync.value ?? [];
+    final recipesMap = ref.watch(recipesMapProvider);
+    final usersByNameMap = ref.watch(usersByNameMapProvider);
 
     // Financial calculations
     final totalMonthlyLimit = budgetState.categories.fold(0.0, (sum, cat) => sum + cat.limit);
@@ -63,13 +63,7 @@ class OverviewScreen extends ConsumerWidget {
       orElse: () => MealPlan(id: todayId, date: DateTime.now(), recipeId: null),
     );
 
-    Recipe? todaysRecipe;
-    if (todaysPlan.recipeId != null) {
-      final matches = recipes.where((r) => r.id == todaysPlan.recipeId);
-      if (matches.isNotEmpty) {
-        todaysRecipe = matches.first;
-      }
-    }
+    final Recipe? todaysRecipe = todaysPlan.recipeId != null ? recipesMap[todaysPlan.recipeId] : null;
     final plannedDinnersCount = mealPlan.where((p) => p.recipeId != null).length;
 
     // Chores done count
@@ -128,7 +122,7 @@ class OverviewScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 24),
                 Expanded(
-                  child: _buildChoresCard(context, ref, chores, users, choresDoneCount),
+                  child: _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
                 ),
               ],
             ),
@@ -139,7 +133,7 @@ class OverviewScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             _buildInventoryCard(context, lowItems),
             const SizedBox(height: 16),
-            _buildChoresCard(context, ref, chores, users, choresDoneCount),
+            _buildChoresCard(context, ref, chores, usersByNameMap, choresDoneCount),
           ],
           const SizedBox(height: 40),
         ],
@@ -174,10 +168,7 @@ class OverviewScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           Text(
             '${remaining.round().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]} ')} zł',
-            style: GoogleFonts.dmMono(
-              fontSize: 44,
-              fontWeight: FontWeight.w400,
-              letterSpacing: -1.0,
+            style: AppTheme.monoHuge.copyWith(
               color: isDanger ? AppTheme.danger : AppTheme.ink,
             ),
             maxLines: 1,
@@ -194,18 +185,18 @@ class OverviewScreen extends ConsumerWidget {
                 children: [
                   Text(
                     '${spent.round()} zł wydano',
-                    style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                    style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                   ),
                   Text(
                     '${(ratio * 100).round()}% z ${limit.round()} zł',
-                    style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                    style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 'Zarejestrowany przychód · ${income.round()} zł',
-                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
               ),
             ],
           ),
@@ -231,7 +222,7 @@ class OverviewScreen extends ConsumerWidget {
               Text('DZISIEJSZY OBIAD · DZIŚ', style: AppTheme.microStyle),
               Text(
                 '$plannedCount z 14 zaplanowanych',
-                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
               ),
             ],
           ),
@@ -246,7 +237,7 @@ class OverviewScreen extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               '${recipe.ingredients.length} składników · ${recipe.prepTime ?? 30} min',
-              style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+              style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
             ),
           ] else ...[
             Text(
@@ -273,9 +264,8 @@ class OverviewScreen extends ConsumerWidget {
                         const SizedBox(width: 6),
                         Text(
                           'Ugotowane',
-                          style: GoogleFonts.instrumentSans(
+                          style: AppTheme.sansMedium.copyWith(
                             color: AppTheme.moss,
-                            fontSize: 14,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -322,8 +312,7 @@ class OverviewScreen extends ConsumerWidget {
                 ),
                 child: Text(
                   '${lowItems.length} prod.',
-                  style: GoogleFonts.dmMono(
-                    fontSize: 12,
+                  style: AppTheme.monoSmall.copyWith(
                     fontWeight: FontWeight.w500,
                     color: AppTheme.danger,
                   ),
@@ -364,13 +353,13 @@ class OverviewScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           item.name,
-                          style: GoogleFonts.instrumentSans(fontSize: 14, color: AppTheme.ink),
+                          style: AppTheme.sansMedium,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
                         '${item.quantity} ${item.unit}',
-                        style: GoogleFonts.dmMono(
+                        style: AppTheme.monoSmall.copyWith(
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: AppTheme.danger,
@@ -386,8 +375,7 @@ class OverviewScreen extends ConsumerWidget {
             onTap: () => context.go('/inventory'),
             child: Text(
               'Otwórz spiżarnię →',
-              style: GoogleFonts.instrumentSans(
-                fontSize: 14,
+              style: AppTheme.sansMedium.copyWith(
                 fontWeight: FontWeight.w500,
                 color: AppTheme.moss,
               ),
@@ -398,7 +386,7 @@ class OverviewScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildChoresCard(BuildContext context, WidgetRef ref, List<dynamic> chores, List<dynamic> users, int doneCount) {
+  Widget _buildChoresCard(BuildContext context, WidgetRef ref, List<dynamic> chores, Map<String, dynamic> usersByNameMap, int doneCount) {
     return Container(
       constraints: const BoxConstraints(minHeight: 250),
       decoration: AppTheme.cardDecoration,
@@ -412,7 +400,7 @@ class OverviewScreen extends ConsumerWidget {
               Text('DZISIEJSZE OBOWIĄZKI', style: AppTheme.microStyle),
               Text(
                 '$doneCount/${chores.length}',
-                style: GoogleFonts.dmMono(fontSize: 12, color: AppTheme.muted),
+                style: AppTheme.monoSmall.copyWith(color: AppTheme.muted),
               ),
             ],
           ),
@@ -433,8 +421,7 @@ class OverviewScreen extends ConsumerWidget {
               separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
               itemBuilder: (context, index) {
                 final chore = chores[index];
-                final userMatches = users.where((u) => u.name == chore.assignee);
-                final assignedUser = userMatches.isNotEmpty ? userMatches.first : null;
+                final assignedUser = usersByNameMap[chore.assignee];
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -450,8 +437,7 @@ class OverviewScreen extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           chore.name,
-                          style: GoogleFonts.instrumentSans(
-                            fontSize: 14,
+                          style: AppTheme.sansMedium.copyWith(
                             color: chore.isDone ? AppTheme.muted : AppTheme.ink,
                             decoration: chore.isDone ? TextDecoration.lineThrough : null,
                           ),

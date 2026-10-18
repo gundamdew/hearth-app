@@ -1,7 +1,6 @@
 // lib/screens/cleaning_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme.dart';
 import '../providers/cleaning_provider.dart';
 import '../providers/users_provider.dart';
@@ -15,16 +14,6 @@ class CleaningScreen extends ConsumerStatefulWidget {
 }
 
 class _CleaningScreenState extends ConsumerState<CleaningScreen> {
-  final TextEditingController _taskNameCtrl = TextEditingController();
-  final TextEditingController _roomCtrl = TextEditingController(text: 'Kuchnia');
-  String? _selectedAssignee;
-
-  @override
-  void dispose() {
-    _taskNameCtrl.dispose();
-    _roomCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,10 +30,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
     final chores = choresAsync.value ?? [];
     final users = usersAsync.value ?? [];
     final userNames = users.map((u) => u.name).toList();
-
-    if (_selectedAssignee == null && users.isNotEmpty) {
-      _selectedAssignee = users.first.name;
-    }
+    final usersByNameMap = ref.watch(usersByNameMapProvider);
 
     final topResidentCards = LayoutBuilder(
       builder: (context, constraints) {
@@ -94,7 +80,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                             ),
                             Text(
                               '$doneCount/${userChores.length}',
-                              style: GoogleFonts.dmMono(fontSize: 13, color: AppTheme.muted),
+                              style: AppTheme.monoSmall.copyWith(fontSize: 13, color: AppTheme.muted),
                             ),
                           ],
                         ),
@@ -198,11 +184,12 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                     separatorBuilder: (context, index) => const Divider(color: AppTheme.line, height: 1),
                     itemBuilder: (context, index) {
                       final chore = chores[index];
-                      final userMatches = users.where((u) => u.name == chore.assignee);
-                      final assignedUser = userMatches.isNotEmpty ? userMatches.first : null;
+                      final assignedUser = usersByNameMap[chore.assignee];
 
-                      return Dismissible(
-                        key: Key(chore.id),
+                      return RepaintBoundary(
+                        key: ValueKey(chore.id),
+                        child: Dismissible(
+                          key: Key(chore.id),
                         direction: DismissDirection.endToStart,
                         background: Container(
                           color: AppTheme.danger,
@@ -265,7 +252,7 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       chore.category,
-                                      style: GoogleFonts.instrumentSans(fontSize: 12, color: AppTheme.muted),
+                                      style: AppTheme.sansSmall.copyWith(color: AppTheme.muted),
                                     ),
                                   ],
                                 ),
@@ -286,151 +273,185 @@ class _CleaningScreenState extends ConsumerState<CleaningScreen> {
                             ],
                           ),
                         ),
+                      ),
                       );
                     },
                   ),
 
-                // Add Task Bar at bottom of card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: const BoxDecoration(
-                    color: Color.fromRGBO(247, 245, 240, 0.6),
-                    border: Border(top: BorderSide(color: AppTheme.line)),
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final useHorizontal = constraints.maxWidth >= 600;
-
-                      final taskInput = TextField(
-                        controller: _taskNameCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'np. Odkamienić czajnik',
-                          fillColor: Colors.white,
-                        ),
-                      );
-
-                      final roomInput = TextField(
-                        controller: _roomCtrl,
-                        decoration: const InputDecoration(
-                          hintText: 'Kuchnia',
-                          fillColor: Colors.white,
-                        ),
-                      );
-
-                      final assigneeSelect = HearthSelect<String>(
-                        value: _selectedAssignee ?? '',
-                        items: userNames,
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedAssignee = val);
-                        },
-                        labelBuilder: (name) => name,
-                      );
-
-                      final addBtn = ElevatedButton.icon(
-                        onPressed: () {
-                          final name = _taskNameCtrl.text.trim();
-                          final room = _roomCtrl.text.trim().isEmpty ? 'Kuchnia' : _roomCtrl.text.trim();
-                          final assignee = _selectedAssignee ?? (userNames.isNotEmpty ? userNames.first : '');
-
-                          if (name.isNotEmpty && assignee.isNotEmpty) {
-                            ref.read(cleaningControllerProvider).addChore(name, room, assignee);
-                            _taskNameCtrl.clear();
-                            FocusScope.of(context).unfocus();
-                          }
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Dodaj zadanie'),
-                      );
-
-                      if (useHorizontal) {
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Nazwa zadania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                                  const SizedBox(height: 6),
-                                  taskInput,
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Pomieszczenie', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                                  const SizedBox(height: 6),
-                                  roomInput,
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Osoba', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                                  const SizedBox(height: 6),
-                                  assigneeSelect,
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            addBtn,
-                          ],
-                        );
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text('Nazwa zadania', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                          const SizedBox(height: 6),
-                          taskInput,
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Pomieszczenie', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                                    const SizedBox(height: 6),
-                                    roomInput,
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Osoba', style: GoogleFonts.instrumentSans(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.muted)),
-                                    const SizedBox(height: 6),
-                                    assigneeSelect,
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          addBtn,
-                        ],
-                      );
-                    },
-                  ),
-                ),
+                // Isolated Add Task Bar
+                _AddChoreFormCard(userNames: userNames),
               ],
             ),
           ),
           const SizedBox(height: 48),
         ],
+      ),
+    );
+  }
+}
+
+class _AddChoreFormCard extends ConsumerStatefulWidget {
+  final List<String> userNames;
+
+  const _AddChoreFormCard({required this.userNames});
+
+  @override
+  ConsumerState<_AddChoreFormCard> createState() => _AddChoreFormCardState();
+}
+
+class _AddChoreFormCardState extends ConsumerState<_AddChoreFormCard> {
+  final TextEditingController _taskNameCtrl = TextEditingController();
+  final TextEditingController _roomCtrl = TextEditingController(text: 'Kuchnia');
+  String? _selectedAssignee;
+
+  @override
+  void dispose() {
+    _taskNameCtrl.dispose();
+    _roomCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_selectedAssignee == null && widget.userNames.isNotEmpty) {
+      _selectedAssignee = widget.userNames.first;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Color.fromRGBO(247, 245, 240, 0.6),
+        border: Border(top: BorderSide(color: AppTheme.line)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final useHorizontal = constraints.maxWidth >= 600;
+
+          final taskInput = TextField(
+            controller: _taskNameCtrl,
+            decoration: const InputDecoration(
+              hintText: 'np. Odkamienić czajnik',
+              fillColor: Colors.white,
+            ),
+          );
+
+          final roomInput = TextField(
+            controller: _roomCtrl,
+            decoration: const InputDecoration(
+              hintText: 'Kuchnia',
+              fillColor: Colors.white,
+            ),
+          );
+
+          final assigneeSelect = HearthSelect<String>(
+            value: _selectedAssignee ?? '',
+            items: widget.userNames,
+            onChanged: (val) {
+              if (val != null) {
+                setState(() => _selectedAssignee = val);
+              }
+            },
+            labelBuilder: (name) => name,
+          );
+
+          final addBtn = ElevatedButton.icon(
+            onPressed: () {
+              final name = _taskNameCtrl.text.trim();
+              final room = _roomCtrl.text.trim().isEmpty ? 'Kuchnia' : _roomCtrl.text.trim();
+              final assignee = _selectedAssignee ?? (widget.userNames.isNotEmpty ? widget.userNames.first : '');
+
+              if (name.isNotEmpty && assignee.isNotEmpty) {
+                ref.read(cleaningControllerProvider).addChore(name, room, assignee);
+                _taskNameCtrl.clear();
+                FocusScope.of(context).unfocus();
+              }
+            },
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('Dodaj zadanie'),
+          );
+
+          if (useHorizontal) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Nazwa zadania', style: AppTheme.sansLabel),
+                      const SizedBox(height: 6),
+                      taskInput,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pomieszczenie', style: AppTheme.sansLabel),
+                      const SizedBox(height: 6),
+                      roomInput,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Osoba', style: AppTheme.sansLabel),
+                      const SizedBox(height: 6),
+                      assigneeSelect,
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                addBtn,
+              ],
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Nazwa zadania', style: AppTheme.sansLabel),
+              const SizedBox(height: 6),
+              taskInput,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Pomieszczenie', style: AppTheme.sansLabel),
+                        const SizedBox(height: 6),
+                        roomInput,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Osoba', style: AppTheme.sansLabel),
+                        const SizedBox(height: 6),
+                        assigneeSelect,
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              addBtn,
+            ],
+          );
+        },
       ),
     );
   }
